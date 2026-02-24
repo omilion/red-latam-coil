@@ -130,8 +130,9 @@ const AdminPortal: React.FC = () => {
         init();
     }, []);
 
-    const handleOpenMediaLibrary = async (target: string = 'featured_media') => {
-        setMediaTarget(target);
+    const handleOpenMediaLibrary = async (target: any = 'featured_media') => {
+        const actualTarget = typeof target === 'string' ? target : 'featured_media';
+        setMediaTarget(actualTarget);
         setShowMediaLibrary(true);
         setLoadingMedia(true);
         try {
@@ -144,16 +145,18 @@ const AdminPortal: React.FC = () => {
         }
     };
 
-    const handleSelectMedia = (url: string) => {
+    const handleSelectMedia = (media: any) => {
+        const url = typeof media === 'string' ? media : media.source_url;
         if (mediaTarget === 'hero_bg') {
             setWebSettings({ ...webSettings, hero: { ...webSettings.hero, bg_image: url } });
-        } else if (mediaTarget?.startsWith('team_member_')) {
+        } else if (mediaTarget && mediaTarget.startsWith('team_member_')) {
             const index = parseInt(mediaTarget.replace('team_member_', ''));
             const newTeam = [...webSettings.team];
             newTeam[index].image = url;
             setWebSettings({ ...webSettings, team: newTeam });
         } else {
-            setEditingItem({ ...editingItem, featured_media_url: url });
+            const mediaId = typeof media === 'object' ? media.id : undefined;
+            setEditingItem({ ...editingItem, featured_media: mediaId, featured_media_url: url });
         }
         setShowMediaLibrary(false);
         setMediaTarget(null);
@@ -367,6 +370,14 @@ const AdminPortal: React.FC = () => {
                         { key: 'rlc_membership_duration', value: editingItem.rlc_membership_duration || '1' },
                         { key: 'rlc_membership_period', value: editingItem.rlc_membership_period || 'years' }
                     ];
+                }
+
+                if (editingItem.featured_media) {
+                    productData.images = [{ id: editingItem.featured_media }];
+                } else if (editingItem.featured_media_url) {
+                    productData.images = [{ src: editingItem.featured_media_url }];
+                } else if (editingItem.featured_media_url === '') {
+                    productData.images = [];
                 }
 
                 if (editingItem?.id) {
@@ -2221,7 +2232,7 @@ const AdminPortal: React.FC = () => {
                                             {allMedia.map((media) => (
                                                 <button
                                                     key={media.id}
-                                                    onClick={() => handleSelectMedia(media.source_url)}
+                                                    onClick={() => handleSelectMedia(media)}
                                                     className="aspect-square rounded-3xl overflow-hidden bg-slate-100 border-2 border-transparent hover:border-secondary hover:scale-105 transition-all group relative"
                                                 >
                                                     <img src={media.source_url} className="w-full h-full object-cover" alt={media.title?.rendered} />

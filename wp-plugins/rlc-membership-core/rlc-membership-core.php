@@ -1104,7 +1104,6 @@ class RLC_Membership_Core
         }
 
         $model = isset($params['model']) ? $params['model'] : 'gemini-3-flash-preview';
-        $api_key = RLC_GEMINI_API_KEY;
         $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$api_key}";
 
         $body = json_encode([
