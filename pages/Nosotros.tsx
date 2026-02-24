@@ -96,39 +96,54 @@ const Nosotros: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              { title: t('about.values.inclusion'), icon: 'all_inclusive', text: t('about.values.inclusion.desc') },
-              { title: t('about.values.collab'), icon: 'handshake', text: t('about.values.collab.desc') },
-              { title: t('about.values.innov'), icon: 'psychology', text: t('about.values.innov.desc') }
-            ].map((v, i) => (
-              <div key={i} className="flex flex-col items-center text-center p-10 bg-white rounded-[2.5rem] shadow-sm border border-slate-100 hover:shadow-xl hover:scale-105 transition-all group">
-                <div className="w-20 h-20 rounded-[2rem] bg-secondary/10 flex items-center justify-center text-secondary mb-8 group-hover:bg-secondary group-hover:text-white transition-all">
-                  <span className="material-symbols-outlined text-4xl">{v.icon}</span>
-                </div>
-                <h4 className="text-2xl font-black text-primary mb-4">{v.title}</h4>
-                <p className="text-slate-500 font-light leading-relaxed text-sm">{v.text}</p>
-              </div>
-            ))}
-          </div>
-
           <div className="bg-white p-12 rounded-[3rem] shadow-sm border border-slate-100 mt-16 animate-in fade-in slide-in-from-bottom-8 duration-700">
-            <h3 className="text-3xl font-display font-black text-primary mb-8 flex items-center gap-4">
-              <span className="material-symbols-outlined text-secondary">target</span>
-              {t('about.objectives.title')}
-              <div className="h-1 flex-1 bg-slate-100 rounded-full"></div>
-            </h3>
-            <div className="grid md:grid-cols-3 gap-8 text-left">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="relative pl-10 group">
-                  <div className="absolute left-0 top-0 w-8 h-8 rounded-full bg-secondary/10 text-secondary flex items-center justify-center text-xs font-black group-hover:bg-secondary group-hover:text-white transition-all">
-                    {i}
-                  </div>
-                  <p className="text-slate-500 font-light leading-relaxed text-sm">
-                    {t(`about.objectives.${i}`)}
-                  </p>
+            <div className="grid lg:grid-cols-2 gap-16">
+              {/* Columna 1: Valores */}
+              <div>
+                <h3 className="text-3xl font-display font-black text-primary mb-10 flex items-center gap-4">
+                  <span className="material-symbols-outlined text-secondary">verified</span>
+                  Valores
+                  <div className="h-1 flex-1 bg-slate-100 rounded-full"></div>
+                </h3>
+                <div className="space-y-8">
+                  {[
+                    { title: t('about.values.inclusion'), icon: 'all_inclusive', text: t('about.values.inclusion.desc') },
+                    { title: t('about.values.collab'), icon: 'handshake', text: t('about.values.collab.desc') },
+                    { title: t('about.values.innov'), icon: 'psychology', text: t('about.values.innov.desc') }
+                  ].map((v, i) => (
+                    <div key={i} className="flex items-start gap-6 group">
+                      <div className="w-12 h-12 shrink-0 rounded-2xl bg-secondary/10 flex items-center justify-center text-secondary group-hover:bg-secondary group-hover:text-white transition-all">
+                        <span className="material-symbols-outlined text-2xl">{v.icon}</span>
+                      </div>
+                      <div>
+                        <h4 className="text-xl font-black text-primary mb-1">{v.title}</h4>
+                        <p className="text-slate-500 font-light leading-relaxed text-sm">{v.text}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
+
+              {/* Columna 2: Objetivos Estratégicos */}
+              <div>
+                <h3 className="text-3xl font-display font-black text-primary mb-10 flex items-center gap-4">
+                  <span className="material-symbols-outlined text-secondary">target</span>
+                  {t('about.objectives.title')}
+                  <div className="h-1 flex-1 bg-slate-100 rounded-full"></div>
+                </h3>
+                <div className="space-y-8 text-left">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="relative pl-12 group">
+                      <div className="absolute left-0 top-0 w-8 h-8 rounded-full bg-secondary/10 text-secondary flex items-center justify-center text-xs font-black group-hover:bg-secondary group-hover:text-white transition-all">
+                        {i}
+                      </div>
+                      <p className="text-slate-500 font-light leading-relaxed text-sm">
+                        {t(`about.objectives.${i}`)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -258,7 +273,7 @@ const Nosotros: React.FC = () => {
                       </button>
                     </div>
                     <div className="p-8 overflow-y-auto">
-                      <div className="grid md:grid-cols-2 gap-8">
+                      <div className="grid md:grid-cols-3 gap-6">
                         {[
                           {
                             uni: 'Universidad Veracruzana',
@@ -286,14 +301,14 @@ const Nosotros: React.FC = () => {
                             members: ['María Fernanda Vega de Mendoza']
                           }
                         ].map((founder, idx) => (
-                          <div key={idx} className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 flex flex-col items-center text-center">
-                            <div className="h-16 flex items-center justify-center mb-6">
+                          <div key={idx} className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 flex flex-col items-center text-center hover:bg-white hover:shadow-xl transition-all duration-300">
+                            <div className="h-12 flex items-center justify-center mb-4">
                               <img src={founder.logo} alt={founder.uni} className="max-h-full max-w-full object-contain" />
                             </div>
-                            <h4 className="font-black text-primary mb-4 leading-tight">{founder.uni}</h4>
-                            <div className="space-y-1">
+                            <h4 className="font-bold text-primary mb-3 leading-tight text-sm">{founder.uni}</h4>
+                            <div className="space-y-0.5">
                               {founder.members.map((m, mIdx) => (
-                                <p key={mIdx} className="text-sm text-slate-500 italic font-light">{m}</p>
+                                <p key={mIdx} className="text-[10px] text-slate-500 italic font-light">{m}</p>
                               ))}
                             </div>
                           </div>
