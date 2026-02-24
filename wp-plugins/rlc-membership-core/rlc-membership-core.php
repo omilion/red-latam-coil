@@ -1085,10 +1085,14 @@ class RLC_Membership_Core
      */
     public function handle_ai_generate($request)
     {
-        // Leer key desde wp-config.php
-        if (!defined('RLC_GEMINI_API_KEY') || empty(RLC_GEMINI_API_KEY)) {
+        // Leer key: primero de la BD, luego de wp-config.php como fallback
+        $api_key = get_option('rlc_gemini_api_key', '');
+        if (empty($api_key) && defined('RLC_GEMINI_API_KEY')) {
+            $api_key = RLC_GEMINI_API_KEY;
+        }
+        if (empty($api_key)) {
             return new WP_REST_Response([
-                'message' => 'API key de Gemini no configurada en wp-config.php'
+                'message' => 'API key de Gemini no configurada'
             ], 500);
         }
 
