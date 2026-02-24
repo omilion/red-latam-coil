@@ -195,9 +195,13 @@ const Nosotros: React.FC = () => {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 md:gap-12">
             {teamMembers.map((m: any, i: number) => (
               <div key={i} className="group cursor-default">
-                <div className="aspect-[4/5] bg-white/5 rounded-[2.5rem] border border-white/10 p-2 overflow-hidden mb-6 relative hover:border-secondary/50 transition-colors">
-                  <div className="w-full h-full bg-slate-800 rounded-[2rem] flex items-center justify-center grayscale group-hover:grayscale-0 transition-all duration-700">
-                    <span className="material-symbols-outlined text-8xl text-white/10 group-hover:text-secondary group-hover:scale-110 transition-all">{m.icon}</span>
+                <div className="aspect-[4/5] bg-white/5 rounded-[2.5rem] border border-white/10 p-2 overflow-hidden mb-6 relative hover:border-secondary/50 transition-colors shadow-2xl">
+                  <div className="w-full h-full bg-slate-800 rounded-[2rem] flex items-center justify-center grayscale group-hover:grayscale-0 transition-all duration-700 overflow-hidden">
+                    {m.image ? (
+                      <img src={m.image} className="w-full h-full object-cover scale-110 group-hover:scale-100 transition-transform duration-1000" alt={m.name} />
+                    ) : (
+                      <span className="material-symbols-outlined text-8xl text-white/10 group-hover:text-secondary group-hover:scale-110 transition-all">{m.icon || 'person'}</span>
+                    )}
                   </div>
                 </div>
                 <h4 className="font-bold text-xl text-white group-hover:text-secondary transition-colors">{m.name}</h4>

@@ -134,6 +134,11 @@ const AdminPortal: React.FC = () => {
     const handleSelectMedia = (url: string) => {
         if (mediaTarget === 'hero_bg') {
             setWebSettings({ ...webSettings, hero: { ...webSettings.hero, bg_image: url } });
+        } else if (mediaTarget?.startsWith('team_member_')) {
+            const index = parseInt(mediaTarget.replace('team_member_', ''));
+            const newTeam = [...webSettings.team];
+            newTeam[index].image = url;
+            setWebSettings({ ...webSettings, team: newTeam });
         } else {
             setEditingItem({ ...editingItem, featured_media_url: url });
         }
@@ -265,6 +270,11 @@ const AdminPortal: React.FC = () => {
                 setWebSettings({ ...webSettings, hero: { ...webSettings.hero, bg_image: media.source_url } });
             } else if (mediaTarget === 'resource_url') {
                 setEditingItem({ ...editingItem, url: media.source_url, rlc_resource_url: media.source_url });
+            } else if (mediaTarget?.startsWith('team_member_')) {
+                const index = parseInt(mediaTarget.replace('team_member_', ''));
+                const newTeam = [...webSettings.team];
+                newTeam[index].image = media.source_url;
+                setWebSettings({ ...webSettings, team: newTeam });
             } else {
                 setEditingItem({
                     ...editingItem,
@@ -1018,17 +1028,42 @@ const AdminPortal: React.FC = () => {
                                 {webSettings.team.map((member: any, idx: number) => (
                                     <div key={idx} className={`p-6 rounded-[2rem] border transition-all ${member.visible ? 'bg-white border-slate-200' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
                                         <div className="flex gap-6 items-start">
-                                            <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-300 border border-slate-200 relative">
-                                                <span className="material-symbols-outlined text-3xl">{member.icon}</span>
+                                            <div className="w-20 h-20 bg-slate-100 rounded-[2rem] flex items-center justify-center text-slate-300 border border-slate-200 relative group/avatar overflow-hidden shrink-0 shadow-inner">
+                                                {member.image ? (
+                                                    <img src={member.image} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <span className="material-symbols-outlined text-4xl">{member.icon || 'person'}</span>
+                                                )}
+
+                                                <div className="absolute inset-0 bg-primary/80 opacity-0 group-hover/avatar:opacity-100 transition-all flex flex-col items-center justify-center gap-2 backdrop-blur-sm">
+                                                    <label className="w-8 h-8 bg-secondary text-primary rounded-full cursor-pointer hover:scale-110 transition-transform flex items-center justify-center shadow-lg active:scale-95">
+                                                        <input
+                                                            type="file"
+                                                            className="hidden"
+                                                            accept="image/*"
+                                                            onChange={(e) => { setMediaTarget(`team_member_${idx}`); handleMediaUpload(e); }}
+                                                            disabled={mediaUpload.loading}
+                                                        />
+                                                        <span className="material-symbols-outlined text-sm">{mediaUpload.loading && mediaTarget === `team_member_${idx}` ? 'sync' : 'upload'}</span>
+                                                    </label>
+                                                    <button
+                                                        onClick={() => handleOpenMediaLibrary(`team_member_${idx}`)}
+                                                        className="w-8 h-8 bg-white/20 text-white rounded-full hover:bg-white/40 hover:scale-110 transition-transform flex items-center justify-center backdrop-blur-md"
+                                                        title="Galería"
+                                                    >
+                                                        <span className="material-symbols-outlined text-sm">perm_media</span>
+                                                    </button>
+                                                </div>
+
                                                 <button
                                                     onClick={() => {
                                                         const newTeam = [...webSettings.team];
                                                         newTeam[idx].visible = !newTeam[idx].visible;
                                                         setWebSettings({ ...webSettings, team: newTeam });
                                                     }}
-                                                    className={`absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-[18px] shadow-sm border ${member.visible ? 'bg-green-500 text-white border-green-600' : 'bg-slate-400 text-white border-slate-500'}`}
+                                                    className={`absolute -top-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center text-[12px] shadow-md border z-10 ${member.visible ? 'bg-green-500 text-white border-green-600' : 'bg-slate-400 text-white border-slate-500'}`}
                                                 >
-                                                    <span className="material-symbols-outlined text-sm">{member.visible ? 'visibility' : 'visibility_off'}</span>
+                                                    <span className="material-symbols-outlined text-[14px]">{member.visible ? 'visibility' : 'visibility_off'}</span>
                                                 </button>
                                             </div>
                                             <div className="flex-grow space-y-3">
