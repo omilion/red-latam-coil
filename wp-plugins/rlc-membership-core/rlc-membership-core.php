@@ -338,7 +338,7 @@ class RLC_Membership_Core
         }
 
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log("[RLC Login] Input: '$login_input' → Resolved username: '$username'");
+            error_log("[RLC Login] Input: '$login_input' -> Resolved username: '$username'");
         }
 
         $user = wp_authenticate($username, $password);
