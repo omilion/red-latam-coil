@@ -45,9 +45,11 @@ class RLC_Membership_Core
 
         // 7. Configuración de Correo Saliente y Newsletter
         add_filter('wp_mail_from', function () {
-            return 'admin@redlatamcoil.com'; });
+            return 'admin@redlatamcoil.com';
+        });
         add_filter('wp_mail_from_name', function () {
-            return 'Red LATAM COIL'; });
+            return 'Red LATAM COIL';
+        });
     }
 
     /**
@@ -140,6 +142,33 @@ class RLC_Membership_Core
             'callback' => [$this, 'handle_newsletter_subscription'],
             'permission_callback' => '__return_true'
         ]);
+
+        register_rest_route('rlc/v1', '/categories', [
+            'methods' => 'GET',
+            'callback' => [$this, 'get_resource_categories'],
+            'permission_callback' => '__return_true'
+        ]);
+
+        register_rest_route('rlc/v1', '/admin/categories', [
+            'methods' => 'POST',
+            'callback' => [$this, 'create_resource_category'],
+            'permission_callback' => [$this, 'is_admin']
+        ]);
+    }
+
+    public function get_resource_categories()
+    {
+        $terms = get_terms(['taxonomy' => 'categoria_recurso', 'hide_empty' => false]);
+        return new WP_REST_Response($terms, 200);
+    }
+
+    public function create_resource_category($request)
+    {
+        $name = $request['name'];
+        $term = wp_insert_term($name, 'categoria_recurso');
+        if (is_wp_error($term))
+            return $term;
+        return new WP_REST_Response(get_term($term['term_id'], 'categoria_recurso'), 200);
     }
 
     /**
@@ -159,24 +188,44 @@ class RLC_Membership_Core
         if ($user_id > 0)
             return $user_id;
 
-        $auth_header = isset($_SERVER['HTTP_AUTHORIZATION']) ? $_SERVER['HTTP_AUTHORIZATION'] : (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION']) ? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] : null);
-
-        if (!$auth_header && function_exists('apache_request_headers')) {
+        // Intentar obtener el header de múltiples lugares (Apache, Nginx, redirecciones cPanel)
+        $auth_header = null;
+        if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
+            $auth_header = $_SERVER['HTTP_AUTHORIZATION'];
+        } elseif (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+            $auth_header = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+        } elseif (function_exists('apache_request_headers')) {
             $headers = apache_request_headers();
-            if (isset($headers['Authorization']))
+            if (isset($headers['Authorization'])) {
                 $auth_header = $headers['Authorization'];
+            }
         }
 
-        if (!$auth_header)
+        // Logging de depuración para el administrador (solo visible en logs de PHP/Headers)
+        if ($auth_header) {
+            header("X-RLC-Auth-Status: Header Found");
+        } else {
+            header("X-RLC-Auth-Status: Header Missing");
+        }
+
+        if (!$auth_header || strpos($auth_header, 'Bearer ') !== 0) {
             return $user_id;
+        }
 
         $token = str_replace('Bearer ', '', $auth_header);
         $decoded = base64_decode($token);
+
         if (!$decoded)
             return $user_id;
 
         $parts = explode(':', $decoded);
-        return (count($parts) >= 2) ? intval($parts[0]) : $user_id;
+        if (count($parts) >= 2) {
+            $found_id = intval($parts[0]);
+            header("X-RLC-User-ID: " . $found_id);
+            return $found_id;
+        }
+
+        return $user_id;
     }
 
     /**
@@ -814,10 +863,13 @@ class RLC_Membership_Core
             return new WP_Error('invalid_data', 'No se recibieron datos', ['status' => 400]);
         }
 
-        update_option('rlc_web_settings', $params);
+        // Si los datos vienen dentro de una clave 'settings', los extraemos
+        $settings_to_save = isset($params['settings']) ? $params['settings'] : $params;
 
-        // Generate Mirror
-        $mirror = $params;
+        update_option('rlc_web_settings', $settings_to_save);
+
+        // Generar Mirror Traducido solo si hay cambios en texto
+        $mirror = $settings_to_save;
         if (isset($mirror['hero'])) {
             $mirror['hero']['title'] = $this->translate_with_gemini($mirror['hero']['title']);
             $mirror['hero']['subtitle'] = $this->translate_with_gemini($mirror['hero']['subtitle']);
@@ -829,7 +881,11 @@ class RLC_Membership_Core
         }
         update_option('rlc_web_settings_en', $mirror);
 
-        return new WP_REST_Response(['success' => true], 200);
+        return new WP_REST_Response([
+            'success' => true,
+            'message' => 'Configuración actualizada correctamente',
+            'data' => $settings_to_save
+        ], 200);
     }
 
     /**

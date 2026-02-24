@@ -282,8 +282,10 @@ const AdminPortal: React.FC = () => {
                     featured_media_url: media.source_url
                 });
             }
-        } catch (error) {
-            setMediaUpload({ loading: false, error: 'Error al subir archivo' });
+        } catch (error: any) {
+            console.error('Error uploading to WP:', error);
+            setMediaUpload({ loading: false, error: error.message || 'Error al subir archivo' });
+            alert(`Error al subir imagen: ${error.message || 'El servidor rechazó el archivo'}`);
         } finally {
             setMediaUpload((prev) => ({ ...prev, loading: false }));
             setMediaTarget(null);

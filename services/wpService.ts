@@ -396,20 +396,29 @@ export const wpService = {
   async uploadMedia(file: File) {
     try {
       const token = localStorage.getItem('rlc_token');
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('title', file.name);
 
-      const response = await fetch(`${WP_URL}/wp-json/wp/v2/media`, {
+      // WordPress REST API: Binario en el body + metadatos en headers/query
+      // Agregamos el título en la query string para asegurar que WP lo asigne correctamente
+      const url = `${WP_URL}/wp-json/wp/v2/media?title=${encodeURIComponent(file.name)}`;
+
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': file.type,
+          'Content-Disposition': `attachment; filename="${encodeURIComponent(file.name)}"`
         },
-        body: formData
+        body: file
       });
 
-      if (!response.ok) throw new Error('Error al subir medios');
-      return await response.json();
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('WP Media Upload Failure:', data);
+        throw new Error(data.message || 'Error al subir medios a WordPress');
+      }
+
+      return data;
     } catch (error) {
       console.error('WP Service Error (uploadMedia):', error);
       throw error;
