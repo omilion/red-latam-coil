@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
     ComposableMap,
     Geographies,
@@ -13,17 +13,17 @@ import {
 const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
 const points = [
-    { id: 'mex', coordinates: [-102.55, 23.63], name: 'México' },
-    { id: 'col', coordinates: [-74.07, 4.71], name: 'Colombia' },
-    { id: 'per', coordinates: [-77.04, -12.04], name: 'Perú' },
-    { id: 'chi', coordinates: [-70.66, -33.44], name: 'Chile' },
-    { id: 'arg', coordinates: [-58.38, -34.60], name: 'Argentina' },
-    { id: 'bra', coordinates: [-47.88, -15.79], name: 'Brasil' },
-    { id: 'spa', coordinates: [-3.70, 40.41], name: 'España' },
-    { id: 'ecu', coordinates: [-78.46, -0.18], name: 'Ecuador' },
-    { id: 'pan', coordinates: [-79.51, 8.98], name: 'Panamá' },
-    { id: 'cri', coordinates: [-84.09, 9.92], name: 'C. Rica' },
-    { id: 'uru', coordinates: [-56.16, -34.90], name: 'Uruguay' },
+    { id: 'mex', coordinates: [-102.55, 23.63], name: 'México', institutions: 45 },
+    { id: 'col', coordinates: [-74.07, 4.71], name: 'Colombia', institutions: 38 },
+    { id: 'per', coordinates: [-77.04, -12.04], name: 'Perú', institutions: 22 },
+    { id: 'chi', coordinates: [-70.66, -33.44], name: 'Chile', institutions: 15 },
+    { id: 'arg', coordinates: [-58.38, -34.60], name: 'Argentina', institutions: 28 },
+    { id: 'bra', coordinates: [-47.88, -15.79], name: 'Brasil', institutions: 31 },
+    { id: 'spa', coordinates: [-3.70, 40.41], name: 'España', institutions: 12 },
+    { id: 'ecu', coordinates: [-78.46, -0.18], name: 'Ecuador', institutions: 18 },
+    { id: 'pan', coordinates: [-79.51, 8.98], name: 'Panamá', institutions: 9 },
+    { id: 'cri', coordinates: [-84.09, 9.92], name: 'C. Rica', institutions: 11 },
+    { id: 'uru', coordinates: [-56.16, -34.90], name: 'Uruguay', institutions: 7 },
 ];
 
 const connections = [
@@ -44,71 +44,88 @@ const connections = [
     { from: 'arg', to: 'uru' },
 ];
 
+// Nombres de países socios para colorear
+const partnerCountries = [
+    "Mexico", "Colombia", "Peru", "Chile", "Argentina", "Brazil",
+    "Spain", "Ecuador", "Panama", "Costa Rica", "Uruguay"
+];
+
 const NetworkMap: React.FC = () => {
+    const [tooltipContent, setTooltipContent] = useState<string | null>(null);
+
     return (
-        <div className="relative w-full h-[600px] overflow-hidden bg-white rounded-[3rem] border border-slate-100 shadow-2xl shadow-primary/5 group/map cursor-move">
+        <div className="relative w-full h-[600px] overflow-hidden bg-slate-50 rounded-[3rem] border border-slate-200 shadow-2xl shadow-primary/10 group/map cursor-grab active:cursor-grabbing">
             <style>
                 {`
-                @keyframes dash {
-                    from { stroke-dashoffset: 1000; opacity: 0; }
-                    to { stroke-dashoffset: 0; opacity: 1; }
+                @keyframes flow {
+                    0% { stroke-dashoffset: 20; opacity: 0.3; }
+                    50% { opacity: 1; }
+                    100% { stroke-dashoffset: 0; opacity: 0.3; }
                 }
-                @keyframes pulse-ring {
-                    0% { transform: scale(0.5); opacity: 0.8; }
-                    100% { transform: scale(2.5); opacity: 0; }
-                }
-                @keyframes float {
-                    0%, 100% { transform: translateY(0); }
-                    50% { transform: translateY(-5px); }
+                @keyframes pulse-cyan {
+                    0% { box-shadow: 0 0 0 0 rgba(0, 184, 212, 0.4); }
+                    70% { box-shadow: 0 0 0 10px rgba(0, 184, 212, 0); }
+                    100% { box-shadow: 0 0 0 0 rgba(0, 184, 212, 0); }
                 }
                 .connection-line {
-                    stroke-dasharray: 1000;
-                    animation: dash 5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+                    stroke-dasharray: 4;
+                    animation: flow 3s linear infinite;
+                    filter: drop-shadow(0 0 2px rgba(246, 168, 0, 0.5));
                 }
-                .point-ring {
-                    animation: pulse-ring 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+                .partner-land {
+                    transition: all 0.5s ease;
                 }
-                .floating-text {
-                    animation: float 6s ease-in-out infinite;
-                }
-                .map-container svg {
-                    filter: drop-shadow(0 10px 30px rgba(15, 23, 42, 0.05));
+                .map-svg {
+                  filter: drop-shadow(0 20px 50px rgba(15, 23, 42, 0.1));
                 }
                 `}
             </style>
 
-            <div className="w-full h-full p-4 map-container">
+            <div className="w-full h-full map-container">
                 <ComposableMap
                     projection="geoMercator"
                     projectionConfig={{
-                        scale: 300,
+                        scale: 350,
                     }}
+                    className="map-svg"
                     style={{
                         width: "100%",
                         height: "100%",
                     }}
                 >
-                    <ZoomableGroup center={[-60, 0]} zoom={0.8} minZoom={0.5} maxZoom={4}>
+                    <ZoomableGroup center={[-75, -5]} zoom={1.2} minZoom={0.5} maxZoom={4}>
                         <Geographies geography={geoUrl}>
                             {({ geographies }) =>
-                                geographies.map((geo) => (
-                                    <Geography
-                                        key={geo.rsmKey}
-                                        geography={geo}
-                                        fill="#F1F5F9"
-                                        stroke="#E2E8F0"
-                                        strokeWidth={0.5}
-                                        style={{
-                                            default: { outline: "none" },
-                                            hover: { fill: "#F8FAFC", outline: "none" },
-                                            pressed: { outline: "none" },
-                                        }}
-                                    />
-                                ))
+                                geographies.map((geo) => {
+                                    const isPartner = partnerCountries.includes(geo.properties.name);
+                                    return (
+                                        <Geography
+                                            key={geo.rsmKey}
+                                            geography={geo}
+                                            fill={isPartner ? "#E0F2F1" : "#FFFFFF"}
+                                            stroke={isPartner ? "#00B8D4" : "#F1F5F9"}
+                                            strokeWidth={isPartner ? 0.8 : 0.4}
+                                            className="partner-land"
+                                            style={{
+                                                default: { outline: "none" },
+                                                hover: {
+                                                    fill: isPartner ? "#B2DFDB" : "#F8FAFC",
+                                                    outline: "none",
+                                                    cursor: isPartner ? "pointer" : "default"
+                                                },
+                                                pressed: { outline: "none" },
+                                            }}
+                                            onMouseEnter={() => {
+                                                if (isPartner) setTooltipContent(geo.properties.name);
+                                            }}
+                                            onMouseLeave={() => setTooltipContent(null)}
+                                        />
+                                    );
+                                })
                             }
                         </Geographies>
 
-                        {/* Líneas de conexión */}
+                        {/* Líneas de conexión curvas */}
                         {connections.map((conn, i) => {
                             const p1 = points.find(p => p.id === conn.from)!;
                             const p2 = points.find(p => p.id === conn.to)!;
@@ -119,39 +136,43 @@ const NetworkMap: React.FC = () => {
                                     from={p1.coordinates as [number, number]}
                                     to={p2.coordinates as [number, number]}
                                     stroke="#F6A800"
-                                    strokeWidth={1.5}
+                                    strokeWidth={1.2}
                                     strokeLinecap="round"
                                     className="connection-line"
                                     style={{
-                                        animationDelay: `${i * 0.4}s`,
-                                        opacity: 0.4
+                                        animationDelay: `${i * 0.2}s`,
                                     }}
                                 />
                             );
                         })}
 
-                        {/* Marcadores */}
+                        {/* Marcadores Neón */}
                         {points.map((p, idx) => (
                             <Marker key={p.id} coordinates={p.coordinates as [number, number]}>
-                                <g className="group/marker transition-all duration-300">
+                                <g
+                                    className="group/marker transition-all duration-300 cursor-pointer"
+                                    onMouseEnter={() => setTooltipContent(`${p.name}: ${p.institutions} Instituciones`)}
+                                    onMouseLeave={() => setTooltipContent(null)}
+                                >
                                     <circle
-                                        r={p.id === 'spa' ? 6 : 4}
-                                        className="point-ring"
-                                        fill="#F6A800"
-                                        fillOpacity={0.6}
+                                        r={6}
+                                        fill="#00B8D4"
+                                        fillOpacity={0.2}
+                                        className="animate-pulse"
                                     />
                                     <circle
                                         r={3}
-                                        fill="#0F172A"
-                                        className="group-hover/marker:fill-secondary group-hover/marker:r-4 transition-all"
+                                        fill="#00B8D4"
+                                        className="group-hover/marker:r-5 transition-all shadow-lg"
+                                        style={{ filter: 'drop-shadow(0 0 5px #00B8D4)' }}
                                     />
+
                                     <text
                                         textAnchor="middle"
-                                        y={-12}
-                                        className="text-[8px] font-black uppercase tracking-widest fill-slate-400 group-hover/marker:fill-primary transition-colors pointer-events-none floating-text"
+                                        y={-15}
+                                        className="text-[10px] font-black uppercase tracking-widest fill-primary opacity-0 group-hover/marker:opacity-100 transition-all pointer-events-none"
                                         style={{
-                                            fontSize: '8px',
-                                            animationDelay: `${idx * 0.3}s`,
+                                            fontSize: '7px',
                                             fontFamily: 'system-ui, -apple-system, sans-serif'
                                         }}
                                     >
@@ -164,42 +185,58 @@ const NetworkMap: React.FC = () => {
                 </ComposableMap>
             </div>
 
+            {/* Floating Tooltip */}
+            {tooltipContent && (
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+                    <div className="bg-primary/90 backdrop-blur-md text-white px-6 py-3 rounded-2xl shadow-2xl border border-white/20 animate-in zoom-in duration-200">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-secondary mb-1">Nivel de Conexión</p>
+                        <p className="text-sm font-bold">{tooltipContent}</p>
+                    </div>
+                </div>
+            )}
+
             {/* Hint overlay */}
             <div className="absolute bottom-32 right-10 flex items-center gap-2 bg-white/40 backdrop-blur px-4 py-2 rounded-full border border-white/40 opacity-0 group-hover/map:opacity-100 transition-opacity">
                 <span className="material-symbols-outlined text-xs text-primary">drag_pan</span>
-                <span className="text-[8px] font-black uppercase tracking-widest text-primary">Arrastra para mover • Scroll para zoom</span>
+                <span className="text-[8px] font-black uppercase tracking-widest text-primary">Navega por el continente</span>
             </div>
 
             {/* Glassmorphism Details Overlay */}
             <div className="absolute top-10 left-10 flex flex-col gap-3">
-                <div className="bg-white/70 backdrop-blur-md border border-white/40 p-4 rounded-2xl shadow-xl flex items-center gap-3 animate-fade-in">
-                    <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white">
-                        <span className="material-symbols-outlined text-sm">public</span>
+                <div className="bg-white/80 backdrop-blur-xl border border-white p-5 rounded-[2rem] shadow-2xl flex items-center gap-4 animate-in slide-in-from-left duration-700">
+                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white shadow-lg shadow-secondary/20">
+                        <span className="material-symbols-outlined text-lg">hub</span>
                     </div>
                     <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Impacto Global</p>
-                        <p className="text-xs font-black text-primary leading-none">Iberoamérica Conectada</p>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Red Latam COIL</p>
+                        <p className="text-sm font-black text-primary leading-none">Iberoamérica Conectada</p>
                     </div>
                 </div>
             </div>
 
-            <div className="absolute bottom-10 left-10 right-10 bg-white/60 backdrop-blur-lg border border-white/50 p-6 rounded-[2rem] flex items-center justify-between shadow-2xl">
-                <div className="flex items-center gap-4">
-                    <div className="flex -space-x-3">
-                        {[1, 2, 3, 4].map(i => (
-                            <div key={i} className="w-8 h-8 rounded-full border-2 border-white bg-slate-200 overflow-hidden shadow-sm">
-                                <img src={`https://i.pravatar.cc/150?u=${i + 10}`} alt="" />
+            <div className="absolute bottom-10 left-10 right-10 bg-white/70 backdrop-blur-2xl border border-white p-6 rounded-[2.5rem] flex items-center justify-between shadow-2xl animate-in fade-in slide-in-from-bottom duration-1000">
+                <div className="flex items-center gap-6">
+                    <div className="flex -space-x-4">
+                        {[1, 2, 3, 4, 5].map(i => (
+                            <div key={i} className="w-10 h-10 rounded-full border-3 border-white bg-slate-200 overflow-hidden shadow-xl hover:scale-110 hover:z-10 transition-all">
+                                <img src={`https://i.pravatar.cc/150?u=rlc${i}`} alt="" />
                             </div>
                         ))}
                     </div>
                     <div>
-                        <p className="text-[10px] font-black text-primary uppercase tracking-widest leading-none mb-1">Membresía Activa</p>
-                        <p className="text-[9px] text-slate-400 font-bold uppercase transition-all">+200 Instituciones</p>
+                        <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] leading-none mb-1.5">Nuestra Comunidad</p>
+                        <div className="flex items-center gap-2 text-slate-500">
+                            <span className="material-symbols-outlined text-sm">apartment</span>
+                            <p className="text-xs font-bold transition-all">+200 Universidades en Red</p>
+                        </div>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
-                    <span className="text-[9px] font-black text-primary uppercase tracking-widest italic">Live Connections</span>
+                <div className="flex items-center gap-3 bg-secondary/10 px-6 py-3 rounded-full border border-secondary/20">
+                    <span className="relative flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-secondary"></span>
+                    </span>
+                    <span className="text-[10px] font-black text-primary uppercase tracking-[0.2em] italic">Live Connections</span>
                 </div>
             </div>
         </div>
