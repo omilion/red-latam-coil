@@ -19,7 +19,6 @@ const points = [
     { id: 'chi', coordinates: [-70.66, -33.44], name: 'Chile', institutions: 15 },
     { id: 'arg', coordinates: [-58.38, -34.60], name: 'Argentina', institutions: 28 },
     { id: 'bra', coordinates: [-47.88, -15.79], name: 'Brasil', institutions: 31 },
-    { id: 'spa', coordinates: [-3.70, 40.41], name: 'España', institutions: 12 },
     { id: 'ecu', coordinates: [-78.46, -0.18], name: 'Ecuador', institutions: 18 },
     { id: 'pan', coordinates: [-79.51, 8.98], name: 'Panamá', institutions: 9 },
     { id: 'cri', coordinates: [-84.09, 9.92], name: 'C. Rica', institutions: 11 },
@@ -28,12 +27,10 @@ const points = [
 
 const connections = [
     { from: 'mex', to: 'col' },
-    { from: 'mex', to: 'spa' },
     { from: 'col', to: 'bra' },
     { from: 'per', to: 'chi' },
     { from: 'chi', to: 'arg' },
     { from: 'bra', to: 'arg' },
-    { from: 'bra', to: 'spa' },
     { from: 'col', to: 'arg' },
     { from: 'mex', to: 'pan' },
     { from: 'mex', to: 'cri' },
@@ -47,7 +44,7 @@ const connections = [
 // Nombres de países socios para colorear
 const partnerCountries = [
     "Mexico", "Colombia", "Peru", "Chile", "Argentina", "Brazil",
-    "Spain", "Ecuador", "Panama", "Costa Rica", "Uruguay"
+    "Ecuador", "Panama", "Costa Rica", "Uruguay"
 ];
 
 const NetworkMap: React.FC = () => {
@@ -85,7 +82,7 @@ const NetworkMap: React.FC = () => {
                 <ComposableMap
                     projection="geoMercator"
                     projectionConfig={{
-                        scale: 350,
+                        scale: 320,
                     }}
                     className="map-svg"
                     style={{
@@ -93,7 +90,7 @@ const NetworkMap: React.FC = () => {
                         height: "100%",
                     }}
                 >
-                    <ZoomableGroup center={[-75, -5]} zoom={1.2} minZoom={0.5} maxZoom={4}>
+                    <ZoomableGroup center={[-70, -15]} zoom={1.0} minZoom={0.5} maxZoom={4}>
                         <Geographies geography={geoUrl}>
                             {({ geographies }) =>
                                 geographies.map((geo) => {
@@ -168,11 +165,12 @@ const NetworkMap: React.FC = () => {
                                     />
 
                                     <text
-                                        textAnchor="middle"
-                                        y={-15}
-                                        className="text-[10px] font-black uppercase tracking-widest fill-primary opacity-0 group-hover/marker:opacity-100 transition-all pointer-events-none"
+                                        textAnchor="start"
+                                        x={8}
+                                        y={3}
+                                        className="text-[8px] font-black uppercase tracking-widest fill-primary/60 group-hover/marker:fill-primary transition-all pointer-events-none"
                                         style={{
-                                            fontSize: '7px',
+                                            fontSize: '6px',
                                             fontFamily: 'system-ui, -apple-system, sans-serif'
                                         }}
                                     >
@@ -201,18 +199,6 @@ const NetworkMap: React.FC = () => {
                 <span className="text-[8px] font-black uppercase tracking-widest text-primary">Navega por el continente</span>
             </div>
 
-            {/* Glassmorphism Details Overlay */}
-            <div className="absolute top-10 left-10 flex flex-col gap-3">
-                <div className="bg-white/80 backdrop-blur-xl border border-white p-5 rounded-[2rem] shadow-2xl flex items-center gap-4 animate-in slide-in-from-left duration-700">
-                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white shadow-lg shadow-secondary/20">
-                        <span className="material-symbols-outlined text-lg">hub</span>
-                    </div>
-                    <div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Red Latam COIL</p>
-                        <p className="text-sm font-black text-primary leading-none">Iberoamérica Conectada</p>
-                    </div>
-                </div>
-            </div>
 
             <div className="absolute bottom-10 left-10 right-10 bg-white/70 backdrop-blur-2xl border border-white p-6 rounded-[2.5rem] flex items-center justify-between shadow-2xl animate-in fade-in slide-in-from-bottom duration-1000">
                 <div className="flex items-center gap-6">

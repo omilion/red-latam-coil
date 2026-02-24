@@ -226,13 +226,6 @@ const Nosotros: React.FC = () => {
 
             <div className="lg:col-span-7 h-[600px] bg-slate-50 rounded-[3rem] border border-slate-100 p-8 shadow-inner overflow-hidden relative">
               <NetworkMap />
-              <div className="absolute top-8 left-8 bg-white/80 backdrop-blur rounded-2xl p-4 border border-slate-100 shadow-xl pointer-events-none">
-                <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-1">{t('about.map.active')}</p>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-secondary animate-pulse"></div>
-                  <p className="text-xs text-slate-500">{t('about.map.conn')}</p>
-                </div>
-              </div>
             </div>
 
             <div className="lg:col-span-5 space-y-10">
