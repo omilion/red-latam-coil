@@ -72,6 +72,13 @@ const AdminPortal: React.FC = () => {
                 flattened[meta.key] = val;
             });
         }
+
+        // Asignar imagen destacada desde WooCommerce si no viene ya como metadato y tiene imágenes
+        if (!flattened.featured_media_url && flattened.images && flattened.images.length > 0) {
+            flattened.featured_media_url = flattened.images[0].src;
+            flattened.featured_media = flattened.images[0].id;
+        }
+
         return flattened;
     };
 

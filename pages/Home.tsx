@@ -6,6 +6,7 @@ import NetworkMap from '../components/NetworkMap';
 import ActionAxes from '../components/ActionAxes';
 import { TranslatableText } from '../components/TranslatableText';
 import { useTranslation } from '../context/useTranslation';
+import { formatEventDateRange } from '../services/dateUtils';
 
 const Home: React.FC = () => {
   const { t } = useTranslation();
@@ -228,7 +229,7 @@ const Home: React.FC = () => {
                   </div>
                   <div className="flex flex-col">
                     <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{t('home.event.when')}</span>
-                    <span className="text-sm font-black">{featuredEvent.rlc_event_date || t('common.tbd')}</span>
+                    <span className="text-sm font-black">{formatEventDateRange(featuredEvent.rlc_event_date, featuredEvent.rlc_event_date_end, 'es-ES')}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">

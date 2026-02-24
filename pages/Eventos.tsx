@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { wpService } from '../services/wpService';
 import { useTranslation } from '../context/useTranslation';
 import { TranslatableText } from '../components/TranslatableText';
+import { formatEventDateRange } from '../services/dateUtils';
 
 const Eventos: React.FC = () => {
   const { t } = useTranslation();
@@ -102,7 +103,7 @@ const Eventos: React.FC = () => {
                     </div>
                     <div>
                       <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{t('events.meta.date')}</p>
-                      <p className="font-black text-primary text-sm">{featuredEvent.rlc_event_date || 'TBD'}</p>
+                      <p className="font-black text-primary text-sm">{formatEventDateRange(featuredEvent.rlc_event_date, featuredEvent.rlc_event_date_end, 'es-ES')}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
@@ -154,7 +155,7 @@ const Eventos: React.FC = () => {
                   />
                   <div className="absolute top-4 left-4">
                     <span className="bg-white/90 backdrop-blur px-3 py-1 rounded-lg text-[9px] font-black text-primary uppercase tracking-widest">
-                      {event.rlc_event_date ? new Date(event.rlc_event_date).toLocaleDateString(t('common.locale', 'es-ES'), { month: 'short', day: 'numeric' }) : 'TBD'}
+                      {formatEventDateRange(event.rlc_event_date, event.rlc_event_date_end, 'es-ES')}
                     </span>
                   </div>
                 </div>

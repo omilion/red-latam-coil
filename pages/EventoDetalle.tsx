@@ -4,7 +4,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { wpService } from '../services/wpService';
 import { useTranslation } from '../context/useTranslation';
 import { TranslatableText } from '../components/TranslatableText';
-
+import { formatEventDateRange } from '../services/dateUtils';
 const EventoDetalle: React.FC = () => {
     const { t } = useTranslation();
     const { id } = useParams<{ id: string }>();
@@ -70,7 +70,7 @@ const EventoDetalle: React.FC = () => {
                                 </div>
                                 <div>
                                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{t('event.detail.meta.date')}</p>
-                                    <p className="font-bold text-white text-sm">{event.rlc_event_date || t('common.tbd')}</p>
+                                    <p className="font-bold text-white text-sm">{formatEventDateRange(event.rlc_event_date, event.rlc_event_date_end, 'es-ES')}</p>
                                     {event.rlc_event_time && <p className="text-xs text-slate-400 font-medium">{event.rlc_event_time} (UTC)</p>}
                                 </div>
                             </div>
