@@ -154,6 +154,13 @@ class RLC_Membership_Core
             'callback' => [$this, 'create_resource_category'],
             'permission_callback' => [$this, 'is_admin']
         ]);
+
+        // AI Proxy - Gemini (key segura en wp-config.php)
+        register_rest_route('rlc/v1', '/ai/generate', [
+            'methods' => 'POST',
+            'callback' => [$this, 'handle_ai_generate'],
+            'permission_callback' => [$this, 'is_admin']
+        ]);
     }
 
     public function get_resource_categories()
@@ -1070,6 +1077,65 @@ class RLC_Membership_Core
         }
 
         return new WP_REST_Response(['translated' => $count], 200);
+    }
+
+    /**
+     * AI PROXY - Llama a Gemini desde el servidor (key segura en wp-config.php)
+     * Requiere: define('RLC_GEMINI_API_KEY', 'tu-key-aqui'); en wp-config.php
+     */
+    public function handle_ai_generate($request)
+    {
+        // Leer key desde wp-config.php
+        if (!defined('RLC_GEMINI_API_KEY') || empty(RLC_GEMINI_API_KEY)) {
+            return new WP_REST_Response([
+                'message' => 'API key de Gemini no configurada en wp-config.php'
+            ], 500);
+        }
+
+        $params = $request->get_json_params();
+        if (empty($params)) {
+            $params = $request->get_params();
+        }
+
+        $prompt = isset($params['prompt']) ? $params['prompt'] : '';
+        if (empty($prompt)) {
+            return new WP_REST_Response(['message' => 'Prompt requerido'], 400);
+        }
+
+        $model = isset($params['model']) ? $params['model'] : 'gemini-2.0-flash';
+        $api_key = RLC_GEMINI_API_KEY;
+        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$api_key}";
+
+        $body = json_encode([
+            'contents' => [
+                ['parts' => [['text' => $prompt]]]
+            ]
+        ]);
+
+        $response = wp_remote_post($url, [
+            'timeout' => 60,
+            'headers' => ['Content-Type' => 'application/json'],
+            'body' => $body
+        ]);
+
+        if (is_wp_error($response)) {
+            return new WP_REST_Response([
+                'message' => 'Error al conectar con Gemini: ' . $response->get_error_message()
+            ], 502);
+        }
+
+        $status_code = wp_remote_retrieve_response_code($response);
+        $response_body = json_decode(wp_remote_retrieve_body($response), true);
+
+        if ($status_code !== 200) {
+            return new WP_REST_Response([
+                'message' => 'Error de Gemini API',
+                'status' => $status_code,
+                'details' => $response_body
+            ], $status_code);
+        }
+
+        return new WP_REST_Response($response_body, 200);
     }
 }
 

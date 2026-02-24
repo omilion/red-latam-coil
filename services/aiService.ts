@@ -1,31 +1,38 @@
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const GEMINI_MODEL = 'gemini-3-flash-preview';
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+const WP_URL = import.meta.env.VITE_WP_URL || 'https://redlatamcoil.com/backend';
+const AI_PROXY_URL = `${WP_URL}/wp-json/rlc/v1/ai/generate`;
+const GEMINI_MODEL = 'gemini-2.0-flash';
 
-console.log(`RLC AI Service: Using Model - ${GEMINI_MODEL}, Key present: ${!!GEMINI_API_KEY}`);
+console.log(`RLC AI Service: Proxy mode via WordPress backend, Model: ${GEMINI_MODEL}`);
 
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
-const callGeminiWithRetry = async (prompt: string, maxRetries = 3): Promise<any> => {
+const callGeminiProxy = async (prompt: string, maxRetries = 3): Promise<any> => {
+    const token = localStorage.getItem('rlc_token');
     let lastError: any;
+
     for (let i = 0; i <= maxRetries; i++) {
         try {
-            const response = await fetch(GEMINI_URL, {
+            const response = await fetch(AI_PROXY_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }]
-                })
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                    'X-WP-Nonce': localStorage.getItem('rlc_nonce') || ''
+                },
+                body: JSON.stringify({ prompt, model: GEMINI_MODEL })
             });
 
             if (response.status === 429) {
                 const waitTime = Math.pow(2, i) * 1000;
-                console.warn(`Gemini API 429: Too Many Requests. Retrying in ${waitTime}ms... (Attempt ${i + 1}/${maxRetries + 1})`);
+                console.warn(`AI Proxy 429: Rate limited. Retrying in ${waitTime}ms... (Attempt ${i + 1}/${maxRetries + 1})`);
                 await delay(waitTime);
                 continue;
             }
 
-            if (!response.ok) throw new Error(`Error en la API de Gemini: ${response.status}`);
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(`Error AI Proxy: ${response.status} - ${errorData.message || 'Unknown error'}`);
+            }
 
             return await response.json();
         } catch (error) {
@@ -62,7 +69,7 @@ export const aiService = {
         `;
 
         try {
-            const data = await callGeminiWithRetry(prompt);
+            const data = await callGeminiProxy(prompt);
             let result = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
 
             const jsonMatch = result.match(/\[[\s\S]*\]/);
@@ -101,7 +108,7 @@ export const aiService = {
         `;
 
         try {
-            const data = await callGeminiWithRetry(prompt);
+            const data = await callGeminiProxy(prompt);
             let result = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
 
             const jsonMatch = result.match(/\[[\s\S]*\]/);
@@ -141,7 +148,7 @@ export const aiService = {
         `;
 
         try {
-            const data = await callGeminiWithRetry(prompt);
+            const data = await callGeminiProxy(prompt);
             let result = data.candidates?.[0]?.content?.parts?.[0]?.text || text;
             result = result.replace(/```html/g, '').replace(/```/g, '').trim();
 
@@ -175,7 +182,7 @@ export const aiService = {
         `;
 
         try {
-            const data = await callGeminiWithRetry(prompt);
+            const data = await callGeminiProxy(prompt);
             return data.candidates?.[0]?.content?.parts?.[0]?.text || text;
         } catch (error) {
             console.error("AI Service Error (translateText):", error);
@@ -183,4 +190,3 @@ export const aiService = {
         }
     }
 };
-
