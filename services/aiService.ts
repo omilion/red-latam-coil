@@ -1,7 +1,8 @@
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
-console.log("RLC AI Service: Using Model - gemini-3-flash-preview");
+console.log(`RLC AI Service: Using Model - ${GEMINI_MODEL}, Key present: ${!!GEMINI_API_KEY}`);
 
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
