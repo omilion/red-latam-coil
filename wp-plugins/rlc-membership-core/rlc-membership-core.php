@@ -1085,14 +1085,11 @@ class RLC_Membership_Core
      */
     public function handle_ai_generate($request)
     {
-        // Leer key: primero de la BD, luego de wp-config.php como fallback
+        // Leer key desde la base de datos (wp_options)
         $api_key = get_option('rlc_gemini_api_key', '');
-        if (empty($api_key) && defined('RLC_GEMINI_API_KEY')) {
-            $api_key = RLC_GEMINI_API_KEY;
-        }
         if (empty($api_key)) {
             return new WP_REST_Response([
-                'message' => 'API key de Gemini no configurada'
+                'message' => 'API key de Gemini no configurada en la base de datos'
             ], 500);
         }
 
@@ -1106,7 +1103,7 @@ class RLC_Membership_Core
             return new WP_REST_Response(['message' => 'Prompt requerido'], 400);
         }
 
-        $model = isset($params['model']) ? $params['model'] : 'gemini-2.0-flash';
+        $model = isset($params['model']) ? $params['model'] : 'gemini-3-flash-preview';
         $api_key = RLC_GEMINI_API_KEY;
         $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$api_key}";
 

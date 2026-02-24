@@ -1,6 +1,6 @@
 const WP_URL = import.meta.env.VITE_WP_URL || 'https://redlatamcoil.com/backend';
 const AI_PROXY_URL = `${WP_URL}/wp-json/rlc/v1/ai/generate`;
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_MODEL = 'gemini-3-flash-preview';
 
 console.log(`RLC AI Service: Proxy mode via WordPress backend, Model: ${GEMINI_MODEL}`);
 
