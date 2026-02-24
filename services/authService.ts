@@ -14,6 +14,7 @@ export interface UserProfile {
     avatar: string;
     expiry_date: string;
     slots_limit: number;
+    is_admin: boolean;
 }
 
 export const authService = {
@@ -27,20 +28,31 @@ export const authService = {
 
             const response = await fetch(`${WP_URL}/wp-json/rlc/v1/user/profile`, {
                 headers: {
-                    'Authorization': `Bearer ${token}`
+                    'Authorization': `Bearer ${token}`,
+                    'X-WP-Nonce': localStorage.getItem('rlc_nonce') || ''
                 }
             });
 
-            if (!response.ok) throw new Error('Session expired');
+            if (!response.ok) {
+                // 401 es esperado cuando la sesión expiró — no es un error real
+                if (response.status === 401 || response.status === 403) {
+                    console.info('[AUTH] Sesión no activa o expirada. Requiere nuevo login.');
+                    localStorage.removeItem('rlc_token');
+                    localStorage.removeItem('rlc_nonce');
+                } else {
+                    console.warn(`[AUTH] Error inesperado en perfil: ${response.status}`);
+                }
+                return null;
+            }
             return await response.json();
         } catch (error) {
-            console.error('Auth error:', error);
-            // No borramos el token aquí automáticamente para evitar bucles si hay error de red
+            // Solo errores de red reales (CORS, servidor caído, etc.)
+            console.warn('[AUTH] Error de red al verificar sesión:', error);
             return null;
         }
     },
 
-    async login(username: string, password: string): Promise<boolean> {
+    async login(email: string, password: string): Promise<boolean> {
         const url = `${WP_URL}/wp-json/rlc/v1/login`;
         console.log(`[AUTH] Intentando login en: ${url}`);
 
@@ -50,7 +62,7 @@ export const authService = {
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ username, password })
+                body: JSON.stringify({ email, password })
             });
 
             console.log(`[AUTH] Respuesta recibida. Status: ${response.status} ${response.statusText}`);
@@ -76,7 +88,8 @@ export const authService = {
             const data = await response.json();
             if (data.token) {
                 localStorage.setItem('rlc_token', data.token);
-                localStorage.setItem('rlc_user_name', data.name);
+                localStorage.setItem('rlc_user_name', data.name || data.full_name);
+                if (data.nonce) localStorage.setItem('rlc_nonce', data.nonce); // Guardar Nonce
                 console.log('[AUTH] Login exitoso');
                 return true;
             }
@@ -93,6 +106,7 @@ export const authService = {
     logout() {
         localStorage.removeItem('rlc_token');
         localStorage.removeItem('rlc_user_name');
+        localStorage.removeItem('rlc_nonce');
         window.dispatchEvent(new Event('storage'));
     },
 

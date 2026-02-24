@@ -167,9 +167,11 @@ export const wpService = {
   async getMembers() {
     try {
       const token = localStorage.getItem('rlc_token');
+      const nonce = localStorage.getItem('rlc_nonce');
       const response = await fetch(`${WP_URL}/wp-json/rlc/v1/admin/members`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'X-WP-Nonce': nonce || ''
         }
       });
       if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
@@ -186,11 +188,13 @@ export const wpService = {
   async assignMembership(userId: number, level: string, expiryDate: string, productType: 'membership' | 'event' = 'membership', membershipType?: string) {
     try {
       const token = localStorage.getItem('rlc_token');
+      const nonce = localStorage.getItem('rlc_nonce');
       const response = await fetch(`${WP_URL}/wp-json/rlc/v1/admin/members/assign`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'X-WP-Nonce': nonce || ''
         },
         body: JSON.stringify({
           user_id: userId,
@@ -214,11 +218,13 @@ export const wpService = {
   async createMember(userData: { name: string, email: string, level?: string, expiry_date?: string, membership_type?: string }) {
     try {
       const token = localStorage.getItem('rlc_token');
+      const nonce = localStorage.getItem('rlc_nonce');
       const response = await fetch(`${WP_URL}/wp-json/rlc/v1/admin/members/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'X-WP-Nonce': nonce || ''
         },
         body: JSON.stringify(userData)
       });
@@ -239,10 +245,12 @@ export const wpService = {
   async deleteMember(userId: number) {
     try {
       const token = localStorage.getItem('rlc_token');
+      const nonce = localStorage.getItem('rlc_nonce');
       const response = await fetch(`${WP_URL}/wp-json/rlc/v1/admin/members/${userId}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'X-WP-Nonce': nonce || ''
         }
       });
       if (!response.ok) throw new Error('Error al eliminar usuario');
@@ -272,11 +280,13 @@ export const wpService = {
   async createPost(postData: any) {
     try {
       const token = localStorage.getItem('rlc_token');
+      const nonce = localStorage.getItem('rlc_nonce');
       const response = await fetch(`${WP_URL}/wp-json/rlc/v1/admin/posts`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'X-WP-Nonce': nonce || ''
         },
         body: JSON.stringify({
           ...postData,
@@ -295,11 +305,13 @@ export const wpService = {
   async updatePost(id: number, postData: any) {
     try {
       const token = localStorage.getItem('rlc_token');
+      const nonce = localStorage.getItem('rlc_nonce');
       const response = await fetch(`${WP_URL}/wp-json/rlc/v1/admin/posts/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'X-WP-Nonce': nonce || ''
         },
         body: JSON.stringify(postData)
       });
@@ -317,10 +329,12 @@ export const wpService = {
   async deletePost(id: number) {
     try {
       const token = localStorage.getItem('rlc_token');
+      const nonce = localStorage.getItem('rlc_nonce');
       const response = await fetch(`${WP_URL}/wp-json/rlc/v1/admin/posts/${id}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'X-WP-Nonce': nonce || ''
         }
       });
       if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
@@ -390,21 +404,18 @@ export const wpService = {
     }
   },
 
-  /**
-   * WordPress: Subir un archivo a la biblioteca de medios.
-   */
   async uploadMedia(file: File) {
     try {
       const token = localStorage.getItem('rlc_token');
+      const nonce = localStorage.getItem('rlc_nonce');
 
-      // WordPress REST API: Binario en el body + metadatos en headers/query
-      // Agregamos el título en la query string para asegurar que WP lo asigne correctamente
       const url = `${WP_URL}/wp-json/wp/v2/media?title=${encodeURIComponent(file.name)}`;
 
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
+          'X-WP-Nonce': nonce || '',
           'Content-Type': file.type,
           'Content-Disposition': `attachment; filename="${encodeURIComponent(file.name)}"`
         },
@@ -460,10 +471,11 @@ export const wpService = {
   async getResourcesAdmin() {
     try {
       const token = localStorage.getItem('rlc_token');
-      // console.log('RLC Admin: Solicitando recursos con token', token ? 'Presente' : 'Ausente');
+      const nonce = localStorage.getItem('rlc_nonce');
       const response = await fetch(`${WP_URL}/wp-json/rlc/v1/admin/resources`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'X-WP-Nonce': nonce || ''
         }
       });
       if (!response.ok) {
@@ -480,11 +492,13 @@ export const wpService = {
   async createResource(data: any) {
     try {
       const token = localStorage.getItem('rlc_token');
+      const nonce = localStorage.getItem('rlc_nonce');
       const response = await fetch(`${WP_URL}/wp-json/rlc/v1/admin/resources`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'X-WP-Nonce': nonce || ''
         },
         body: JSON.stringify({
           ...data,
@@ -502,11 +516,13 @@ export const wpService = {
   async updateResource(id: number, data: any) {
     try {
       const token = localStorage.getItem('rlc_token');
+      const nonce = localStorage.getItem('rlc_nonce');
       const response = await fetch(`${WP_URL}/wp-json/rlc/v1/admin/resources/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'X-WP-Nonce': nonce || ''
         },
         body: JSON.stringify({
           ...data,
@@ -539,12 +555,14 @@ export const wpService = {
   async createResourceCategory(name: string) {
     try {
       const token = localStorage.getItem('rlc_token');
+      const nonce = localStorage.getItem('rlc_nonce');
       // Usamos el endpoint administrativo rlc/v1
       const response = await fetch(`${WP_URL}/wp-json/rlc/v1/admin/categories`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'X-WP-Nonce': nonce || ''
         },
         body: JSON.stringify({ name })
       });
@@ -559,10 +577,12 @@ export const wpService = {
   async deleteResource(id: number) {
     try {
       const token = localStorage.getItem('rlc_token');
+      const nonce = localStorage.getItem('rlc_nonce');
       const response = await fetch(`${WP_URL}/wp-json/rlc/v1/admin/resources/${id}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'X-WP-Nonce': nonce || ''
         }
       });
       if (!response.ok) throw new Error('Error al eliminar recurso');
@@ -596,11 +616,13 @@ export const wpService = {
   async updateWebSettings(settings: any) {
     try {
       const token = localStorage.getItem('rlc_token');
+      const nonce = localStorage.getItem('rlc_nonce');
       const response = await fetch(`${WP_URL}/wp-json/rlc/v1/admin/settings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'X-WP-Nonce': nonce || ''
         },
         body: JSON.stringify(settings)
       });

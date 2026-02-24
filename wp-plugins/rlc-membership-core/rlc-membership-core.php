@@ -37,8 +37,8 @@ class RLC_Membership_Core
 
         // 5. CORS y Autenticación robusta
         add_filter('allowed_http_origins', [$this, 'add_allowed_origins']);
-        add_action('init', [$this, 'handle_cors'], 1); // Prioridad máxima al inicio
-        add_action('determine_current_user', [$this, 'rest_authorize'], 15);
+        add_action('determine_current_user', [$this, 'rest_authorize'], 10);
+        add_filter('rest_authentication_errors', [$this, 'force_rest_auth'], 10);
 
         // 6. AI Translation Hooks
         add_action('save_post', [$this, 'handle_post_translation_sync'], 20, 3);
@@ -180,7 +180,14 @@ class RLC_Membership_Core
     }
     public function is_admin($request)
     {
-        return user_can(get_current_user_id(), 'manage_options');
+        $id = $this->rest_authorize(0);
+        $is_admin = $id > 0 && user_can($id, 'administrator');
+
+        if (!$is_admin && defined('WP_DEBUG') && WP_DEBUG) {
+            error_log("RLC Admin Check Failed: User ID $id is not admin or not found via Bearer Token.");
+        }
+
+        return $is_admin;
     }
 
     public function rest_authorize($user_id)
@@ -188,7 +195,6 @@ class RLC_Membership_Core
         if ($user_id > 0)
             return $user_id;
 
-        // Intentar obtener el header de múltiples lugares (Apache, Nginx, redirecciones cPanel)
         $auth_header = null;
         if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
             $auth_header = $_SERVER['HTTP_AUTHORIZATION'];
@@ -196,16 +202,7 @@ class RLC_Membership_Core
             $auth_header = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
         } elseif (function_exists('apache_request_headers')) {
             $headers = apache_request_headers();
-            if (isset($headers['Authorization'])) {
-                $auth_header = $headers['Authorization'];
-            }
-        }
-
-        // Logging de depuración para el administrador (solo visible en logs de PHP/Headers)
-        if ($auth_header) {
-            header("X-RLC-Auth-Status: Header Found");
-        } else {
-            header("X-RLC-Auth-Status: Header Missing");
+            $auth_header = $headers['Authorization'] ?? $headers['authorization'] ?? null;
         }
 
         if (!$auth_header || strpos($auth_header, 'Bearer ') !== 0) {
@@ -220,12 +217,31 @@ class RLC_Membership_Core
 
         $parts = explode(':', $decoded);
         if (count($parts) >= 2) {
-            $found_id = intval($parts[0]);
-            header("X-RLC-User-ID: " . $found_id);
-            return $found_id;
+            $id = intval($parts[0]);
+            // Verificación cruzada: el ID debe ser un usuario real
+            $user = get_userdata($id);
+            if ($user && $user->user_email === $parts[1]) {
+                return $id;
+            }
         }
 
         return $user_id;
+    }
+
+    /**
+     * Fuerza la identidad del usuario en el contexto de la API REST
+     * para evitar que otros plugins o el core bloqueen la petición antes de tiempo.
+     */
+    public function force_rest_auth($result)
+    {
+        // Si ya hay un error de autenticación previo, lo mantenemos a menos que tengamos Bearer
+        $id = $this->rest_authorize(0);
+        if ($id > 0) {
+            wp_set_current_user($id);
+            // Si el ID es válido, sobreescribimos cualquier error de nonce/cookie
+            return true;
+        }
+        return $result;
     }
 
     /**
@@ -272,15 +288,84 @@ class RLC_Membership_Core
      */
     public function handle_login($request)
     {
-        $user = wp_authenticate($request['username'], $request['password']);
-        if (is_wp_error($user))
-            return new WP_Error('login_failed', 'Credenciales inválidas', ['status' => 403]);
+        // Intentar múltiples fuentes de parámetros para máxima compatibilidad
+        $params = $request->get_json_params();
 
-        return new WP_REST_Response([
-            'token' => base64_encode($user->ID . ':' . wp_generate_password(20, false)),
-            'user_id' => $user->ID,
-            'name' => $user->display_name
-        ], 200);
+        // Fallback 1: get_params() (incluye query, body, y defaults)
+        if (empty($params) || (!isset($params['email']) && !isset($params['username']))) {
+            $all_params = $request->get_params();
+            if (!empty($all_params) && (isset($all_params['email']) || isset($all_params['username']))) {
+                $params = $all_params;
+            }
+        }
+
+        // Fallback 2: parsear php://input directamente
+        if (empty($params) || (!isset($params['email']) && !isset($params['username']))) {
+            $raw = file_get_contents('php://input');
+            if (!empty($raw)) {
+                $decoded = json_decode($raw, true);
+                if (is_array($decoded)) {
+                    $params = $decoded;
+                }
+            }
+        }
+
+        $login_input = isset($params['email']) ? trim($params['email']) : (isset($params['username']) ? trim($params['username']) : '');
+        $password = isset($params['password']) ? $params['password'] : '';
+
+        if (empty($login_input) || empty($password)) {
+            return new WP_REST_Response([
+                'message' => 'Email/usuario y contraseña son requeridos',
+                'debug_keys' => array_keys($params ?: [])
+            ], 400);
+        }
+
+        // Resolver el user_login: si el input es un email, buscar el usuario por email
+        $username = $login_input;
+        if (is_email($login_input)) {
+            $user_by_email = get_user_by('email', $login_input);
+            if ($user_by_email) {
+                $username = $user_by_email->user_login;
+            }
+            // Si no existe, wp_authenticate fallará naturalmente
+        }
+
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log("[RLC Login] Input: '$login_input' → Resolved username: '$username'");
+        }
+
+        $user = wp_authenticate($username, $password);
+
+        if (is_wp_error($user)) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log("[RLC Login] Failed for '$username': " . $user->get_error_message());
+            }
+            return new WP_REST_Response(['message' => 'Credenciales inválidas'], 401);
+        }
+
+        $uid = $user->ID;
+        // Generar token Bearer compatible con rest_authorize()
+        $token = base64_encode($uid . ':' . $user->user_email);
+
+        $res = [
+            'token' => $token,
+            'id' => $uid,
+            'full_name' => $user->display_name,
+            'email' => $user->user_email,
+            'university' => get_user_meta($uid, 'rlc_university', true) ?: '',
+            'country' => get_user_meta($uid, 'rlc_country', true) ?: '',
+            'position' => get_user_meta($uid, 'rlc_position', true) ?: '',
+            'linkedin' => get_user_meta($uid, 'rlc_linkedin', true) ?: '',
+            'membership' => get_user_meta($uid, 'rlc_membership_level', true) ?: 'Ninguna',
+            'status' => get_user_meta($uid, 'rlc_status', true) ?: 'inactive',
+            'expiry_date' => get_user_meta($uid, 'rlc_expiry_date', true) ?: 'N/A',
+            'avatar' => get_avatar_url($uid),
+            'roles' => (array) $user->roles,
+            'is_admin' => in_array('administrator', (array) $user->roles),
+            'nonce' => wp_create_nonce('wp_rest')
+        ];
+
+        return new WP_REST_Response($res, 200);
     }
 
     public function handle_newsletter_subscription($request)
@@ -323,6 +408,8 @@ class RLC_Membership_Core
             'status' => get_user_meta($uid, 'rlc_status', true) ?: 'inactive',
             'expiry_date' => get_user_meta($uid, 'rlc_expiry_date', true) ?: 'N/A',
             'avatar' => get_avatar_url($uid),
+            'roles' => (array) $user->roles,
+            'is_admin' => in_array('administrator', (array) $user->roles)
         ], 200);
     }
 

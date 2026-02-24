@@ -104,18 +104,31 @@ const AdminPortal: React.FC = () => {
 
     useEffect(() => {
         const init = async () => {
-            const currentUser = await authService.getCurrentUser();
-            // Aquí verificaríamos que el usuario sea realmente un admin de Red LatAm
-            if (!currentUser) {
-                navigate('/login');
-                return;
+            try {
+                const currentUser = await authService.getCurrentUser();
+                if (!currentUser || !currentUser.is_admin) {
+                    console.warn('Acceso denegado: Usuario no es administrador', currentUser);
+                    authService.logout();
+                    window.location.href = '/login';
+                    return;
+                }
+
+                // Si el perfil devolvió un nonce, lo guardamos para wpService
+                if ((currentUser as any).nonce) {
+                    localStorage.setItem('rlc_nonce', (currentUser as any).nonce);
+                }
+
+                setUser(currentUser);
+                await loadData();
+            } catch (error) {
+                console.error('Error durante la inicialización:', error);
+                window.location.href = '/login';
+            } finally {
+                setLoading(false);
             }
-            setUser(currentUser);
-            await loadData();
-            setLoading(false);
         };
         init();
-    }, [navigate]);
+    }, []);
 
     const handleOpenMediaLibrary = async (target: string = 'featured_media') => {
         setMediaTarget(target);
@@ -259,23 +272,32 @@ const AdminPortal: React.FC = () => {
         }
     };
 
-    const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>, targetOverride?: string) => {
+        e.stopPropagation(); // Evitar que el clic se propague al padre
         const file = e.target.files?.[0];
         if (!file) return;
+
+        const actualTarget = targetOverride || mediaTarget;
+
+        // Si el target es featured_media y no estamos editando nada, no procedemos
+        if (actualTarget === 'featured_media' && !editingItem && activeTab !== 'web') {
+            console.warn('Upload ignora: featured_media sin item en edición');
+            return;
+        }
 
         setMediaUpload({ loading: true, error: null });
         try {
             const media = await wpService.uploadMedia(file);
-            if (mediaTarget === 'hero_bg') {
+            if (actualTarget === 'hero_bg') {
                 setWebSettings({ ...webSettings, hero: { ...webSettings.hero, bg_image: media.source_url } });
-            } else if (mediaTarget === 'resource_url') {
+            } else if (actualTarget === 'resource_url') {
                 setEditingItem({ ...editingItem, url: media.source_url, rlc_resource_url: media.source_url });
-            } else if (mediaTarget?.startsWith('team_member_')) {
-                const index = parseInt(mediaTarget.replace('team_member_', ''));
+            } else if (actualTarget?.startsWith('team_member_')) {
+                const index = parseInt(actualTarget.replace('team_member_', ''));
                 const newTeam = [...webSettings.team];
                 newTeam[index].image = media.source_url;
                 setWebSettings({ ...webSettings, team: newTeam });
-            } else {
+            } else if (editingItem) {
                 setEditingItem({
                     ...editingItem,
                     featured_media: media.id,
@@ -947,7 +969,7 @@ const AdminPortal: React.FC = () => {
                                                         className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-sm focus:border-secondary transition-all outline-none pr-12"
                                                     />
                                                     <label className="absolute right-2 top-1.5 bottom-1.5 aspect-square bg-secondary text-primary rounded-xl cursor-pointer hover:scale-105 transition-all flex items-center justify-center shadow-lg active:scale-95">
-                                                        <input type="file" className="hidden" accept="image/*" onChange={(e) => { setMediaTarget('hero_bg'); handleMediaUpload(e); }} disabled={mediaUpload.loading} />
+                                                        <input type="file" className="hidden" accept="image/*" onChange={(e) => { setMediaTarget('hero_bg'); handleMediaUpload(e, 'hero_bg'); }} disabled={mediaUpload.loading} />
                                                         <span className="material-symbols-outlined text-lg">{mediaUpload.loading && mediaTarget === 'hero_bg' ? 'sync' : 'upload'}</span>
                                                     </label>
                                                 </div>
@@ -1034,87 +1056,105 @@ const AdminPortal: React.FC = () => {
                                                 {member.image ? (
                                                     <img src={member.image} className="w-full h-full object-cover" />
                                                 ) : (
-                                                    <span className="material-symbols-outlined text-4xl">{member.icon || 'person'}</span>
+                                                    <span className="material-symbols-outlined text-4xl">person</span>
                                                 )}
-
-                                                <div className="absolute inset-0 bg-primary/80 opacity-0 group-hover/avatar:opacity-100 transition-all flex flex-col items-center justify-center gap-2 backdrop-blur-sm">
-                                                    <label className="w-8 h-8 bg-secondary text-primary rounded-full cursor-pointer hover:scale-110 transition-transform flex items-center justify-center shadow-lg active:scale-95">
-                                                        <input
-                                                            type="file"
-                                                            className="hidden"
-                                                            accept="image/*"
-                                                            onChange={(e) => { setMediaTarget(`team_member_${idx}`); handleMediaUpload(e); }}
-                                                            disabled={mediaUpload.loading}
-                                                        />
-                                                        <span className="material-symbols-outlined text-sm">{mediaUpload.loading && mediaTarget === `team_member_${idx}` ? 'sync' : 'upload'}</span>
-                                                    </label>
-                                                    <button
-                                                        onClick={() => handleOpenMediaLibrary(`team_member_${idx}`)}
-                                                        className="w-8 h-8 bg-white/20 text-white rounded-full hover:bg-white/40 hover:scale-110 transition-transform flex items-center justify-center backdrop-blur-md"
-                                                        title="Galería"
-                                                    >
-                                                        <span className="material-symbols-outlined text-sm">perm_media</span>
-                                                    </button>
-                                                </div>
-
-                                                <button
-                                                    onClick={() => {
-                                                        const newTeam = [...webSettings.team];
-                                                        newTeam[idx].visible = !newTeam[idx].visible;
-                                                        setWebSettings({ ...webSettings, team: newTeam });
-                                                    }}
-                                                    className={`absolute -top-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center text-[12px] shadow-md border z-10 ${member.visible ? 'bg-green-500 text-white border-green-600' : 'bg-slate-400 text-white border-slate-500'}`}
+                                                <label
+                                                    className="absolute inset-0 bg-primary/60 opacity-0 group-hover/avatar:opacity-100 flex items-center justify-center cursor-pointer transition-all backdrop-blur-sm"
+                                                    onClick={(e) => e.stopPropagation()}
                                                 >
-                                                    <span className="material-symbols-outlined text-[14px]">{member.visible ? 'visibility' : 'visibility_off'}</span>
-                                                </button>
+                                                    <input
+                                                        type="file"
+                                                        className="hidden"
+                                                        accept="image/*"
+                                                        onChange={(e) => {
+                                                            e.stopPropagation();
+                                                            setMediaTarget(`team_member_${idx}`);
+                                                            handleMediaUpload(e, `team_member_${idx}`);
+                                                        }}
+                                                    />
+                                                    <span className="material-symbols-outlined text-white text-3xl">add_a_photo</span>
+                                                </label>
                                             </div>
-                                            <div className="flex-grow space-y-3">
-                                                <input
-                                                    type="text"
-                                                    value={member.name}
-                                                    onChange={(e) => {
-                                                        const newTeam = [...webSettings.team];
-                                                        newTeam[idx].name = e.target.value;
-                                                        setWebSettings({ ...webSettings, team: newTeam });
+                                            <div className="flex flex-col gap-2">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setMediaTarget(`team_member_${idx}`);
+                                                        handleMediaUpload(e as any, `team_member_${idx}`);
                                                     }}
-                                                    className="w-full bg-transparent border-b border-dashed border-slate-200 py-1 text-sm font-black text-primary outline-none focus:border-secondary transition-colors"
-                                                    placeholder="Nombre Completo"
-                                                />
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <input
-                                                        type="text"
-                                                        value={member.role}
-                                                        onChange={(e) => {
-                                                            const newTeam = [...webSettings.team];
-                                                            newTeam[idx].role = e.target.value;
-                                                            setWebSettings({ ...webSettings, team: newTeam });
-                                                        }}
-                                                        className="w-full bg-slate-50 border border-slate-100 rounded-lg px-3 py-1.5 text-[10px] font-bold text-slate-500 outline-none"
-                                                        placeholder="Cargo"
-                                                    />
-                                                    <input
-                                                        type="text"
-                                                        value={member.inst}
-                                                        onChange={(e) => {
-                                                            const newTeam = [...webSettings.team];
-                                                            newTeam[idx].inst = e.target.value;
-                                                            setWebSettings({ ...webSettings, team: newTeam });
-                                                        }}
-                                                        className="w-full bg-slate-50 border border-slate-100 rounded-lg px-3 py-1.5 text-[10px] italic text-slate-400 outline-none"
-                                                        placeholder="Institución"
-                                                    />
-                                                </div>
+                                                    className="px-4 py-2 bg-slate-100 text-primary rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all flex items-center gap-2"
+                                                >
+                                                    <span className="material-symbols-outlined text-sm">{mediaUpload.loading && mediaTarget === `team_member_${idx}` ? 'sync' : 'upload'}</span>
+                                                    Subir
+                                                </button>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleOpenMediaLibrary(`team_member_${idx}`);
+                                                    }}
+                                                    className="px-4 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all flex items-center gap-2"
+                                                >
+                                                    <span className="material-symbols-outlined text-sm">perm_media</span>
+                                                    Biblioteca
+                                                </button>
                                             </div>
                                             <button
                                                 onClick={() => {
-                                                    const newTeam = webSettings.team.filter((_: any, i: number) => i !== idx);
+                                                    const newTeam = [...webSettings.team];
+                                                    newTeam[idx].visible = !newTeam[idx].visible;
                                                     setWebSettings({ ...webSettings, team: newTeam });
                                                 }}
-                                                className="text-slate-300 hover:text-red-500 transition-colors p-1"
+                                                className={`absolute -top-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center text-[12px] shadow-md border z-10 ${member.visible ? 'bg-green-500 text-white border-green-600' : 'bg-slate-400 text-white border-slate-500'}`}
                                             >
-                                                <span className="material-symbols-outlined text-[18px]">close</span>
+                                                <span className="material-symbols-outlined text-[14px]">{member.visible ? 'visibility' : 'visibility_off'}</span>
                                             </button>
                                         </div>
+                                        <div className="flex-grow space-y-3">
+                                            <input
+                                                type="text"
+                                                value={member.name}
+                                                onChange={(e) => {
+                                                    const newTeam = [...webSettings.team];
+                                                    newTeam[idx].name = e.target.value;
+                                                    setWebSettings({ ...webSettings, team: newTeam });
+                                                }}
+                                                className="w-full bg-transparent border-b border-dashed border-slate-200 py-1 text-sm font-black text-primary outline-none focus:border-secondary transition-colors"
+                                                placeholder="Nombre Completo"
+                                            />
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <input
+                                                    type="text"
+                                                    value={member.role}
+                                                    onChange={(e) => {
+                                                        const newTeam = [...webSettings.team];
+                                                        newTeam[idx].role = e.target.value;
+                                                        setWebSettings({ ...webSettings, team: newTeam });
+                                                    }}
+                                                    className="w-full bg-slate-50 border border-slate-100 rounded-lg px-3 py-1.5 text-[10px] font-bold text-slate-500 outline-none"
+                                                    placeholder="Cargo"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={member.inst}
+                                                    onChange={(e) => {
+                                                        const newTeam = [...webSettings.team];
+                                                        newTeam[idx].inst = e.target.value;
+                                                        setWebSettings({ ...webSettings, team: newTeam });
+                                                    }}
+                                                    className="w-full bg-slate-50 border border-slate-100 rounded-lg px-3 py-1.5 text-[10px] italic text-slate-400 outline-none"
+                                                    placeholder="Institución"
+                                                />
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => {
+                                                const newTeam = webSettings.team.filter((_: any, i: number) => i !== idx);
+                                                setWebSettings({ ...webSettings, team: newTeam });
+                                            }}
+                                            className="text-slate-300 hover:text-red-500 transition-colors p-1"
+                                        >
+                                            <span className="material-symbols-outlined text-[18px]">close</span>
+                                        </button>
                                     </div>
                                 ))}
                             </div>
@@ -1146,959 +1186,982 @@ const AdminPortal: React.FC = () => {
                             </button>
                         </div>
                     </div>
-                )}
+                )
+                }
 
                 {/* Content Table Container - Conditional rendering to avoid duplicates */}
-                {(activeTab !== 'config' && activeTab !== 'membresias' && activeTab !== 'web') && (
-                    <div className="bg-white rounded-[2rem] border border-slate-200 overflow-hidden shadow-sm">
-                        <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                            <div>
-                                <h3 className="font-black text-primary tracking-tight">Lista de {activeTab}</h3>
-                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Mostrando {searchTerm ? 'resultados de búsqueda' : 'todos los registros'}</p>
+                {
+                    (activeTab !== 'config' && activeTab !== 'membresias' && activeTab !== 'web') && (
+                        <div className="bg-white rounded-[2rem] border border-slate-200 overflow-hidden shadow-sm">
+                            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                                <div>
+                                    <h3 className="font-black text-primary tracking-tight">Lista de {activeTab}</h3>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Mostrando {searchTerm ? 'resultados de búsqueda' : 'todos los registros'}</p>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        if (activeTab === 'membresias') {
+                                            const level = 'General';
+                                            setEditingItem({
+                                                name: `Membresía ${level} Personal`,
+                                                regular_price: '0',
+                                                description: '',
+                                                sku: `RLC-PERS-${level.toUpperCase()}-${Math.floor(Math.random() * 1000)}`,
+                                                rlc_membership_level: level
+                                            });
+                                            setIsProduct(true);
+                                        } else if (activeTab === 'eventos') {
+                                            setEditingItem({ name: '', regular_price: '0', sku: 'EVT-' + Date.now() });
+                                            setIsProduct(true);
+                                        } else {
+                                            setEditingItem({});
+                                            setIsProduct(false);
+                                        }
+                                    }}
+                                    className="bg-primary text-white px-6 py-3 rounded-full font-black text-[11px] uppercase tracking-widest hover:bg-secondary transition-colors shadow-lg shadow-primary/10 flex items-center gap-2"
+                                >
+                                    <span className="material-symbols-outlined text-sm">add</span>
+                                    Nuevo Registro
+                                </button>
                             </div>
-                            <button
-                                onClick={() => {
-                                    if (activeTab === 'membresias') {
-                                        const level = 'General';
-                                        setEditingItem({
-                                            name: `Membresía ${level} Personal`,
-                                            regular_price: '0',
-                                            description: '',
-                                            sku: `RLC-PERS-${level.toUpperCase()}-${Math.floor(Math.random() * 1000)}`,
-                                            rlc_membership_level: level
-                                        });
-                                        setIsProduct(true);
-                                    } else if (activeTab === 'eventos') {
-                                        setEditingItem({ name: '', regular_price: '0', sku: 'EVT-' + Date.now() });
-                                        setIsProduct(true);
-                                    } else {
-                                        setEditingItem({});
-                                        setIsProduct(false);
-                                    }
-                                }}
-                                className="bg-primary text-white px-6 py-3 rounded-full font-black text-[11px] uppercase tracking-widest hover:bg-secondary transition-colors shadow-lg shadow-primary/10 flex items-center gap-2"
-                            >
-                                <span className="material-symbols-outlined text-sm">add</span>
-                                Nuevo Registro
-                            </button>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left">
-                                <thead className="bg-slate-50 border-b border-slate-100">
-                                    <tr>
-                                        <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">ID</th>
-                                        <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Contenido</th>
-                                        <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Estado</th>
-                                        <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Fecha</th>
-                                        <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {(activeTab === 'membresias' || activeTab === 'eventos' ? products : activeTab === 'recursos' ? resources : posts)
-                                        .filter(p => {
-                                            const name = p.name?.toLowerCase() || '';
-                                            const sku = p.sku?.toUpperCase() || '';
-                                            if (activeTab === 'membresias') {
-                                                return sku.startsWith('RLC-') || name.includes('membresía') || name.includes('plan') || (!sku.startsWith('EVT-') && !name.includes('evento') && !name.includes('congreso'));
-                                            }
-                                            if (activeTab === 'eventos') {
-                                                return sku.startsWith('EVT-') || name.includes('congreso') || name.includes('evento') || name.includes('global') || name.includes('ciudadanía');
-                                            }
-                                            if (activeTab !== 'recursos') {
-                                                const catMap: any = { 'blog': 1 };
-                                                if (!p.categories?.includes(catMap[activeTab])) return false;
-                                            }
-                                            if (searchTerm) {
-                                                const title = (activeTab === 'membresias' || activeTab === 'eventos') ? p.name : (p.title?.rendered || p.title);
-                                                return title?.toLowerCase().includes(searchTerm.toLowerCase());
-                                            }
-                                            return true;
-                                        })
-                                        .map((p) => (
-                                            <tr key={p.id} className="hover:bg-slate-50/50 transition-colors group">
-                                                <td className="px-8 py-6 text-xs font-mono text-slate-400">#{p.id}</td>
-                                                <td className="px-8 py-6">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden shadow-inner flex-shrink-0">
-                                                            {resolveImageUrl(p) ? (
-                                                                <img src={resolveImageUrl(p)} className="w-full h-full object-cover" />
-                                                            ) : (
-                                                                <div className="w-full h-full flex items-center justify-center text-slate-300">
-                                                                    <span className="material-symbols-outlined">image</span>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                        <div className="max-w-md">
-                                                            <p className="font-bold text-primary truncate">{(activeTab === 'membresias' || activeTab === 'eventos') ? p.name : (p.title?.rendered || p.title || 'Sin Título')}</p>
-                                                            <div className="flex items-center gap-2 mt-0.5">
-                                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                                                                    {(activeTab === 'membresias' || activeTab === 'eventos') ? `Precio: $${p.regular_price}` : `TIPO: ${p.type || activeTab}`}
-                                                                </p>
-                                                                {p.status && p.status !== 'publish' && (
-                                                                    <span className="text-[8px] font-black uppercase px-2 py-0.5 bg-slate-100 text-slate-500 rounded-md border border-slate-200">
-                                                                        {p.status}
-                                                                    </span>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left">
+                                    <thead className="bg-slate-50 border-b border-slate-100">
+                                        <tr>
+                                            <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">ID</th>
+                                            <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Contenido</th>
+                                            <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Estado</th>
+                                            <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Fecha</th>
+                                            <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {(activeTab === 'membresias' || activeTab === 'eventos' ? products : activeTab === 'recursos' ? resources : posts)
+                                            .filter(p => {
+                                                const name = p.name?.toLowerCase() || '';
+                                                const sku = p.sku?.toUpperCase() || '';
+                                                if (activeTab === 'membresias') {
+                                                    return sku.startsWith('RLC-') || name.includes('membresía') || name.includes('plan') || (!sku.startsWith('EVT-') && !name.includes('evento') && !name.includes('congreso'));
+                                                }
+                                                if (activeTab === 'eventos') {
+                                                    return sku.startsWith('EVT-') || name.includes('congreso') || name.includes('evento') || name.includes('global') || name.includes('ciudadanía');
+                                                }
+                                                if (activeTab !== 'recursos') {
+                                                    const catMap: any = { 'blog': 1 };
+                                                    if (!p.categories?.includes(catMap[activeTab])) return false;
+                                                }
+                                                if (searchTerm) {
+                                                    const title = (activeTab === 'membresias' || activeTab === 'eventos') ? p.name : (p.title?.rendered || p.title);
+                                                    return title?.toLowerCase().includes(searchTerm.toLowerCase());
+                                                }
+                                                return true;
+                                            })
+                                            .map((p) => (
+                                                <tr key={p.id} className="hover:bg-slate-50/50 transition-colors group">
+                                                    <td className="px-8 py-6 text-xs font-mono text-slate-400">#{p.id}</td>
+                                                    <td className="px-8 py-6">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden shadow-inner flex-shrink-0">
+                                                                {resolveImageUrl(p) ? (
+                                                                    <img src={resolveImageUrl(p)} className="w-full h-full object-cover" />
+                                                                ) : (
+                                                                    <div className="w-full h-full flex items-center justify-center text-slate-300">
+                                                                        <span className="material-symbols-outlined">image</span>
+                                                                    </div>
                                                                 )}
                                                             </div>
+                                                            <div className="max-w-md">
+                                                                <p className="font-bold text-primary truncate">{(activeTab === 'membresias' || activeTab === 'eventos') ? p.name : (p.title?.rendered || p.title || 'Sin Título')}</p>
+                                                                <div className="flex items-center gap-2 mt-0.5">
+                                                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                                                                        {(activeTab === 'membresias' || activeTab === 'eventos') ? `Precio: $${p.regular_price}` : `TIPO: ${p.type || activeTab}`}
+                                                                    </p>
+                                                                    {p.status && p.status !== 'publish' && (
+                                                                        <span className="text-[8px] font-black uppercase px-2 py-0.5 bg-slate-100 text-slate-500 rounded-md border border-slate-200">
+                                                                            {p.status}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-8 py-6">
-                                                    {activeTab === 'recursos' && (p.rlc_resource_is_premium || p.is_premium) ? (
-                                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-amber-100 text-amber-600 border border-amber-200">
-                                                            Premium
-                                                        </span>
-                                                    ) : (
-                                                        <span className="material-symbols-outlined text-slate-200">fiber_manual_record</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-8 py-6 text-xs text-slate-500 font-medium">
-                                                    {activeTab === 'recursos' ? (p.type || 'N/A') : new Date(p.date || Date.now()).toLocaleDateString()}
-                                                </td>
-                                                <td className="px-8 py-6 text-right">
-                                                    <div className="flex justify-end gap-2">
-                                                        <button
-                                                            onClick={() => {
-                                                                setEditingItem(flattenMeta(p));
-                                                                setIsProduct(activeTab === 'membresias' || activeTab === 'eventos');
-                                                            }}
-                                                            className="w-10 h-10 rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-secondary hover:border-secondary transition-all flex items-center justify-center shadow-sm"
-                                                        >
-                                                            <span className="material-symbols-outlined text-[18px]">edit</span>
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDeleteItem(p.id)}
-                                                            className="w-10 h-10 rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-500 transition-all flex items-center justify-center shadow-sm"
-                                                        >
-                                                            <span className="material-symbols-outlined text-[18px]">delete</span>
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                </tbody>
-                            </table>
+                                                    </td>
+                                                    <td className="px-8 py-6">
+                                                        {activeTab === 'recursos' && (p.rlc_resource_is_premium || p.is_premium) ? (
+                                                            <span className="inline-flex items-center px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-amber-100 text-amber-600 border border-amber-200">
+                                                                Premium
+                                                            </span>
+                                                        ) : (
+                                                            <span className="material-symbols-outlined text-slate-200">fiber_manual_record</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-8 py-6 text-xs text-slate-500 font-medium">
+                                                        {activeTab === 'recursos' ? (p.type || 'N/A') : new Date(p.date || Date.now()).toLocaleDateString()}
+                                                    </td>
+                                                    <td className="px-8 py-6 text-right">
+                                                        <div className="flex justify-end gap-2">
+                                                            <button
+                                                                onClick={() => {
+                                                                    setEditingItem(flattenMeta(p));
+                                                                    setIsProduct(activeTab === 'membresias' || activeTab === 'eventos');
+                                                                }}
+                                                                className="w-10 h-10 rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-secondary hover:border-secondary transition-all flex items-center justify-center shadow-sm"
+                                                            >
+                                                                <span className="material-symbols-outlined text-[18px]">edit</span>
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteItem(p.id)}
+                                                                className="w-10 h-10 rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-500 transition-all flex items-center justify-center shadow-sm"
+                                                            >
+                                                                <span className="material-symbols-outlined text-[18px]">delete</span>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                    </div>
-                )}
+                    )
+                }
 
-                {activeTab === 'config' && (
-                    <div className="p-10 text-center bg-slate-800/30 border border-slate-700/50 rounded-[2.5rem]">
-                        <span className="material-symbols-outlined text-5xl text-slate-700 mb-4">settings</span>
-                        <h3 className="text-xl font-bold text-white">Configuración del Sistema</h3>
-                        <p className="text-slate-500 max-w-md mx-auto mt-2">Ajustes globales de la Red LatAm COIL, claves de API y parámetros de membresía.</p>
-                    </div>
-                )}
+                {
+                    activeTab === 'config' && (
+                        <div className="p-10 text-center bg-slate-800/30 border border-slate-700/50 rounded-[2.5rem]">
+                            <span className="material-symbols-outlined text-5xl text-slate-700 mb-4">settings</span>
+                            <h3 className="text-xl font-bold text-white">Configuración del Sistema</h3>
+                            <p className="text-slate-500 max-w-md mx-auto mt-2">Ajustes globales de la Red LatAm COIL, claves de API y parámetros de membresía.</p>
+                        </div>
+                    )
+                }
 
                 {/* Modal de Edición */}
-                {editingItem && (
-                    <div className="fixed inset-0 md:left-72 bg-slate-50 z-[100] flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
-                        <form onSubmit={handleSavePost} className="flex flex-col h-full">
-                            {/* Editor Header - Compacted */}
-                            <div className="px-8 py-4 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10 shadow-sm">
-                                <div className="flex items-center gap-4">
-                                    <button
-                                        type="button"
-                                        onClick={() => { setEditingItem(null); setIsProduct(false); }}
-                                        className="w-10 h-10 rounded-xl border border-slate-200 flex items-center justify-center text-slate-400 hover:text-primary hover:bg-slate-50 transition-all group"
-                                    >
-                                        <span className="material-symbols-outlined text-xl group-hover:-translate-x-1 transition-transform">arrow_back</span>
-                                    </button>
-                                    <div>
-                                        <h2 className="text-xl font-black text-primary tracking-tight flex items-center gap-3">
-                                            <span className="p-1.5 bg-secondary/10 rounded-lg text-secondary material-symbols-outlined text-xl">
-                                                {isProduct ? 'shopping_bag' : 'edit_note'}
-                                            </span>
-                                            {editingItem.id ? 'Editar' : 'Crear'} {
-                                                activeTab === 'eventos' ? 'Evento' :
-                                                    (activeTab === 'membresias' ? 'Membresía' :
-                                                        (isProduct ? 'Plan' : ({ 'blog': 'Blog', 'recursos': 'Recurso' }[activeTab as keyof any] || 'Contenido')))
-                                            }
-                                        </h2>
-                                        <p className="text-slate-400 text-[9px] font-bold uppercase tracking-widest leading-none">Panel CMS · ID: #{editingItem.id || 'NUEVO'}</p>
+                {
+                    editingItem && (
+                        <div className="fixed inset-0 md:left-72 bg-slate-50 z-[100] flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
+                            <form onSubmit={handleSavePost} className="flex flex-col h-full">
+                                {/* Editor Header - Compacted */}
+                                <div className="px-8 py-4 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10 shadow-sm">
+                                    <div className="flex items-center gap-4">
+                                        <button
+                                            type="button"
+                                            onClick={() => { setEditingItem(null); setIsProduct(false); }}
+                                            className="w-10 h-10 rounded-xl border border-slate-200 flex items-center justify-center text-slate-400 hover:text-primary hover:bg-slate-50 transition-all group"
+                                        >
+                                            <span className="material-symbols-outlined text-xl group-hover:-translate-x-1 transition-transform">arrow_back</span>
+                                        </button>
+                                        <div>
+                                            <h2 className="text-xl font-black text-primary tracking-tight flex items-center gap-3">
+                                                <span className="p-1.5 bg-secondary/10 rounded-lg text-secondary material-symbols-outlined text-xl">
+                                                    {isProduct ? 'shopping_bag' : 'edit_note'}
+                                                </span>
+                                                {editingItem.id ? 'Editar' : 'Crear'} {
+                                                    activeTab === 'eventos' ? 'Evento' :
+                                                        (activeTab === 'membresias' ? 'Membresía' :
+                                                            (isProduct ? 'Plan' : ({ 'blog': 'Blog', 'recursos': 'Recurso' }[activeTab as keyof any] || 'Contenido')))
+                                                }
+                                            </h2>
+                                            <p className="text-slate-400 text-[9px] font-bold uppercase tracking-widest leading-none">Panel CMS · ID: #{editingItem.id || 'NUEVO'}</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => { setEditingItem(null); setIsProduct(false); }}
+                                            className="px-4 py-2 rounded-full text-slate-500 hover:text-primary font-black text-[10px] uppercase tracking-widest transition-colors"
+                                        >
+                                            Descartar
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            disabled={isSaving}
+                                            className="bg-secondary text-primary font-black px-6 py-2.5 rounded-full hover:scale-105 transition-all shadow-lg shadow-secondary/20 disabled:opacity-50 flex items-center gap-2 text-[10px] uppercase tracking-widest"
+                                        >
+                                            {isSaving ? (
+                                                <span className="material-symbols-outlined animate-spin text-sm">sync</span>
+                                            ) : (
+                                                <span className="material-symbols-outlined text-lg">check_circle</span>
+                                            )}
+                                            {isSaving ? 'Guardando...' : 'Publicar'}
+                                        </button>
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-3">
-                                    <button
-                                        type="button"
-                                        onClick={() => { setEditingItem(null); setIsProduct(false); }}
-                                        className="px-4 py-2 rounded-full text-slate-500 hover:text-primary font-black text-[10px] uppercase tracking-widest transition-colors"
-                                    >
-                                        Descartar
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        disabled={isSaving}
-                                        className="bg-secondary text-primary font-black px-6 py-2.5 rounded-full hover:scale-105 transition-all shadow-lg shadow-secondary/20 disabled:opacity-50 flex items-center gap-2 text-[10px] uppercase tracking-widest"
-                                    >
-                                        {isSaving ? (
-                                            <span className="material-symbols-outlined animate-spin text-sm">sync</span>
-                                        ) : (
-                                            <span className="material-symbols-outlined text-lg">check_circle</span>
-                                        )}
-                                        {isSaving ? 'Guardando...' : 'Publicar'}
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Editor Body - Expanded Scrollable Area */}
-                            <div className="flex-grow overflow-y-auto bg-slate-50">
-                                <div className="max-w-6xl mx-auto p-10 md:p-16 space-y-12">
-                                    {/* Sección: Información Principal */}
-                                    <section className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                        <div className="grid grid-cols-1 gap-8">
-                                            <div>
-                                                <label className="block text-[11px] uppercase font-black tracking-widest text-slate-500 mb-3 ml-1">Título del Contenido</label>
-                                                <input
-                                                    type="text"
-                                                    value={isProduct ? (editingItem.name || '') : (editingItem.title?.rendered || editingItem.title || '')}
-                                                    onChange={(e) => setEditingItem(isProduct ? { ...editingItem, name: e.target.value } : { ...editingItem, title: e.target.value })}
-                                                    className="w-full bg-white border border-slate-200 rounded-3xl px-8 py-6 text-primary text-2xl font-bold focus:border-secondary focus:ring-4 focus:ring-secondary/10 transition-all outline-none placeholder:text-slate-300 shadow-sm"
-                                                    placeholder={isProduct ? "Nombre del plan..." : "Escribe un título impactante..."}
-                                                    required
-                                                />
-                                            </div>
-                                        </div>
-
-                                        {isProduct && (
-                                            <>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                                    <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
-                                                        <label className="block text-[11px] uppercase font-black tracking-widest text-slate-500 mb-4">
-                                                            {(activeTab === 'eventos' || editingItem.sku?.startsWith('EVT-')) ? 'Nombre del Evento' : 'Categoría del Plan'}
-                                                        </label>
-                                                        {(activeTab === 'eventos' || editingItem.sku?.startsWith('EVT-')) ? (
-                                                            <input
-                                                                type="text"
-                                                                value={editingItem.name || ''}
-                                                                onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
-                                                                className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-primary font-bold focus:border-secondary outline-none shadow-sm"
-                                                                placeholder="Nombre comercial del evento..."
-                                                            />
-                                                        ) : (
-                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                                <div className="relative">
-                                                                    <label className="block text-[10px] text-slate-400 font-bold mb-2">TIPO DE PLAN</label>
-                                                                    <select
-                                                                        value={editingItem.sku?.includes('INST') ? 'institucional' : 'personal'}
-                                                                        onChange={(e) => {
-                                                                            const isInst = e.target.value === 'institucional';
-                                                                            const level = editingItem.rlc_membership_level || 'General';
-                                                                            const type = isInst ? 'Institucional' : 'Personal';
-                                                                            setEditingItem({
-                                                                                ...editingItem,
-                                                                                name: `Membresía ${level} ${type}`,
-                                                                                sku: `RLC-${isInst ? 'INST' : 'PERS'}-${level.toUpperCase()}-${Math.floor(Math.random() * 1000)}`
-                                                                            });
-                                                                        }}
-                                                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-primary font-bold focus:border-secondary outline-none appearance-none cursor-pointer"
-                                                                    >
-                                                                        <option value="personal">Individual / Personal</option>
-                                                                        <option value="institucional">Universitaria / Institucional</option>
-                                                                    </select>
-                                                                    <span className="material-symbols-outlined absolute right-4 top-[38px] text-slate-400 pointer-events-none text-sm">expand_content</span>
-                                                                </div>
-                                                                <div className="relative">
-                                                                    <label className="block text-[10px] text-slate-400 font-bold mb-2">NIVEL</label>
-                                                                    <select
-                                                                        value={editingItem.rlc_membership_level || 'General'}
-                                                                        onChange={(e) => {
-                                                                            const level = e.target.value;
-                                                                            const isInst = editingItem.sku?.includes('INST');
-                                                                            const type = isInst ? 'Institucional' : 'Personal';
-                                                                            setEditingItem({
-                                                                                ...editingItem,
-                                                                                rlc_membership_level: level,
-                                                                                name: `Membresía ${level} ${type}`,
-                                                                                sku: `RLC-${isInst ? 'INST' : 'PERS'}-${level.toUpperCase()}-${Math.floor(Math.random() * 1000)}`
-                                                                            });
-                                                                        }}
-                                                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-primary font-bold focus:border-secondary outline-none appearance-none cursor-pointer"
-                                                                    >
-                                                                        <option value="General">General (Bronce)</option>
-                                                                        <option value="Plata">Nivel Plata</option>
-                                                                        <option value="Oro">Nivel Oro</option>
-                                                                    </select>
-                                                                    <span className="material-symbols-outlined absolute right-4 top-[38px] text-slate-400 pointer-events-none text-sm">expand_content</span>
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                        <span className="material-symbols-outlined absolute right-4 top-[38px] text-slate-400 pointer-events-none text-sm">expand_content</span>
-                                                    </div>
+                                {/* Editor Body - Expanded Scrollable Area */}
+                                <div className="flex-grow overflow-y-auto bg-slate-50">
+                                    <div className="max-w-6xl mx-auto p-10 md:p-16 space-y-12">
+                                        {/* Sección: Información Principal */}
+                                        <section className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                            <div className="grid grid-cols-1 gap-8">
+                                                <div>
+                                                    <label className="block text-[11px] uppercase font-black tracking-widest text-slate-500 mb-3 ml-1">Título del Contenido</label>
+                                                    <input
+                                                        type="text"
+                                                        value={isProduct ? (editingItem.name || '') : (editingItem.title?.rendered || editingItem.title || '')}
+                                                        onChange={(e) => setEditingItem(isProduct ? { ...editingItem, name: e.target.value } : { ...editingItem, title: e.target.value })}
+                                                        className="w-full bg-white border border-slate-200 rounded-3xl px-8 py-6 text-primary text-2xl font-bold focus:border-secondary focus:ring-4 focus:ring-secondary/10 transition-all outline-none placeholder:text-slate-300 shadow-sm"
+                                                        placeholder={isProduct ? "Nombre del plan..." : "Escribe un título impactante..."}
+                                                        required
+                                                    />
                                                 </div>
-                                                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                        {activeTab === 'membresias' && (
-                                                            <div className="space-y-4">
-                                                                <div className="relative">
-                                                                    <label className="block text-[10px] text-slate-400 font-bold mb-2 uppercase">Tipo de Membresía</label>
-                                                                    <select
-                                                                        value={editingItem.rlc_membership_type || 'personal'}
-                                                                        onChange={(e) => setEditingItem({ ...editingItem, rlc_membership_type: e.target.value })}
-                                                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-primary font-bold focus:border-secondary outline-none appearance-none cursor-pointer"
-                                                                    >
-                                                                        <option value="personal">Personal</option>
-                                                                        <option value="institutional">Institucional</option>
-                                                                    </select>
-                                                                    <span className="material-symbols-outlined absolute right-4 top-[38px] text-slate-400 pointer-events-none text-sm">expand_content</span>
-                                                                </div>
-                                                                {editingItem.rlc_membership_type === 'institutional' && (
-                                                                    <div className="relative">
-                                                                        <label className="block text-[10px] text-slate-400 font-bold mb-2 uppercase">Límite de Cupos</label>
-                                                                        <input
-                                                                            type="number"
-                                                                            value={editingItem.rlc_slots_limit || '0'}
-                                                                            onChange={(e) => setEditingItem({ ...editingItem, rlc_slots_limit: e.target.value })}
-                                                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-primary font-bold focus:border-secondary outline-none shadow-sm"
-                                                                            placeholder="Cantidad de cupos..."
-                                                                        />
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                        <div className="relative">
-                                                            <div className="flex justify-between items-center mb-2">
-                                                                <label className="block text-[10px] text-slate-500 font-black uppercase tracking-widest">
-                                                                    {(activeTab === 'eventos' || editingItem.sku?.startsWith('EVT-')) ? 'Precio (USD)' : 'Inversión (USD)'}
-                                                                </label>
-                                                                {isProduct && (
-                                                                    <div className="flex items-center gap-2">
-                                                                        <label className="text-[10px] text-slate-400 font-bold uppercase">SKU:</label>
-                                                                        <input
-                                                                            type="text"
-                                                                            value={editingItem.sku || ''}
-                                                                            onChange={(e) => setEditingItem({ ...editingItem, sku: e.target.value })}
-                                                                            className="bg-slate-50 border-none text-[10px] font-mono font-bold text-secondary text-right outline-none w-24 px-2 py-1 rounded-md shadow-inner"
-                                                                        />
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                            <div className="relative">
+                                            </div>
+
+                                            {isProduct && (
+                                                <>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                                        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+                                                            <label className="block text-[11px] uppercase font-black tracking-widest text-slate-500 mb-4">
+                                                                {(activeTab === 'eventos' || editingItem.sku?.startsWith('EVT-')) ? 'Nombre del Evento' : 'Categoría del Plan'}
+                                                            </label>
+                                                            {(activeTab === 'eventos' || editingItem.sku?.startsWith('EVT-')) ? (
                                                                 <input
-                                                                    type="number"
-                                                                    value={editingItem.regular_price || ''}
-                                                                    onChange={(e) => setEditingItem({ ...editingItem, regular_price: e.target.value })}
-                                                                    className="w-full bg-white border border-slate-200 rounded-xl px-10 py-3 text-primary text-lg font-black focus:border-secondary outline-none shadow-sm"
-                                                                    placeholder="0.00"
-                                                                    required
+                                                                    type="text"
+                                                                    value={editingItem.name || ''}
+                                                                    onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
+                                                                    className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-primary font-bold focus:border-secondary outline-none shadow-sm"
+                                                                    placeholder="Nombre comercial del evento..."
                                                                 />
-                                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary font-bold text-lg">$</span>
+                                                            ) : (
+                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                    <div className="relative">
+                                                                        <label className="block text-[10px] text-slate-400 font-bold mb-2">TIPO DE PLAN</label>
+                                                                        <select
+                                                                            value={editingItem.sku?.includes('INST') ? 'institucional' : 'personal'}
+                                                                            onChange={(e) => {
+                                                                                const isInst = e.target.value === 'institucional';
+                                                                                const level = editingItem.rlc_membership_level || 'General';
+                                                                                const type = isInst ? 'Institucional' : 'Personal';
+                                                                                setEditingItem({
+                                                                                    ...editingItem,
+                                                                                    name: `Membresía ${level} ${type}`,
+                                                                                    sku: `RLC-${isInst ? 'INST' : 'PERS'}-${level.toUpperCase()}-${Math.floor(Math.random() * 1000)}`
+                                                                                });
+                                                                            }}
+                                                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-primary font-bold focus:border-secondary outline-none appearance-none cursor-pointer"
+                                                                        >
+                                                                            <option value="personal">Individual / Personal</option>
+                                                                            <option value="institucional">Universitaria / Institucional</option>
+                                                                        </select>
+                                                                        <span className="material-symbols-outlined absolute right-4 top-[38px] text-slate-400 pointer-events-none text-sm">expand_content</span>
+                                                                    </div>
+                                                                    <div className="relative">
+                                                                        <label className="block text-[10px] text-slate-400 font-bold mb-2">NIVEL</label>
+                                                                        <select
+                                                                            value={editingItem.rlc_membership_level || 'General'}
+                                                                            onChange={(e) => {
+                                                                                const level = e.target.value;
+                                                                                const isInst = editingItem.sku?.includes('INST');
+                                                                                const type = isInst ? 'Institucional' : 'Personal';
+                                                                                setEditingItem({
+                                                                                    ...editingItem,
+                                                                                    rlc_membership_level: level,
+                                                                                    name: `Membresía ${level} ${type}`,
+                                                                                    sku: `RLC-${isInst ? 'INST' : 'PERS'}-${level.toUpperCase()}-${Math.floor(Math.random() * 1000)}`
+                                                                                });
+                                                                            }}
+                                                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-primary font-bold focus:border-secondary outline-none appearance-none cursor-pointer"
+                                                                        >
+                                                                            <option value="General">General (Bronce)</option>
+                                                                            <option value="Plata">Nivel Plata</option>
+                                                                            <option value="Oro">Nivel Oro</option>
+                                                                        </select>
+                                                                        <span className="material-symbols-outlined absolute right-4 top-[38px] text-slate-400 pointer-events-none text-sm">expand_content</span>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                            <span className="material-symbols-outlined absolute right-4 top-[38px] text-slate-400 pointer-events-none text-sm">expand_content</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                            {activeTab === 'membresias' && (
+                                                                <div className="space-y-4">
+                                                                    <div className="relative">
+                                                                        <label className="block text-[10px] text-slate-400 font-bold mb-2 uppercase">Tipo de Membresía</label>
+                                                                        <select
+                                                                            value={editingItem.rlc_membership_type || 'personal'}
+                                                                            onChange={(e) => setEditingItem({ ...editingItem, rlc_membership_type: e.target.value })}
+                                                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-primary font-bold focus:border-secondary outline-none appearance-none cursor-pointer"
+                                                                        >
+                                                                            <option value="personal">Personal</option>
+                                                                            <option value="institutional">Institucional</option>
+                                                                        </select>
+                                                                        <span className="material-symbols-outlined absolute right-4 top-[38px] text-slate-400 pointer-events-none text-sm">expand_content</span>
+                                                                    </div>
+                                                                    {editingItem.rlc_membership_type === 'institutional' && (
+                                                                        <div className="relative">
+                                                                            <label className="block text-[10px] text-slate-400 font-bold mb-2 uppercase">Límite de Cupos</label>
+                                                                            <input
+                                                                                type="number"
+                                                                                value={editingItem.rlc_slots_limit || '0'}
+                                                                                onChange={(e) => setEditingItem({ ...editingItem, rlc_slots_limit: e.target.value })}
+                                                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-primary font-bold focus:border-secondary outline-none shadow-sm"
+                                                                                placeholder="Cantidad de cupos..."
+                                                                            />
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                            <div className="relative">
+                                                                <div className="flex justify-between items-center mb-2">
+                                                                    <label className="block text-[10px] text-slate-500 font-black uppercase tracking-widest">
+                                                                        {(activeTab === 'eventos' || editingItem.sku?.startsWith('EVT-')) ? 'Precio (USD)' : 'Inversión (USD)'}
+                                                                    </label>
+                                                                    {isProduct && (
+                                                                        <div className="flex items-center gap-2">
+                                                                            <label className="text-[10px] text-slate-400 font-bold uppercase">SKU:</label>
+                                                                            <input
+                                                                                type="text"
+                                                                                value={editingItem.sku || ''}
+                                                                                onChange={(e) => setEditingItem({ ...editingItem, sku: e.target.value })}
+                                                                                className="bg-slate-50 border-none text-[10px] font-mono font-bold text-secondary text-right outline-none w-24 px-2 py-1 rounded-md shadow-inner"
+                                                                            />
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <div className="relative">
+                                                                    <input
+                                                                        type="number"
+                                                                        value={editingItem.regular_price || ''}
+                                                                        onChange={(e) => setEditingItem({ ...editingItem, regular_price: e.target.value })}
+                                                                        className="w-full bg-white border border-slate-200 rounded-xl px-10 py-3 text-primary text-lg font-black focus:border-secondary outline-none shadow-sm"
+                                                                        placeholder="0.00"
+                                                                        required
+                                                                    />
+                                                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary font-bold text-lg">$</span>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            </>
-                                        )}
+                                                </>
+                                            )}
 
-                                        {(activeTab === 'eventos' || editingItem.sku?.startsWith('EVT-')) && (
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
-                                                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
-                                                    <label className="block text-[11px] uppercase font-black tracking-widest text-slate-500 mb-4">Pre-título (ej: Evento Anual)</label>
-                                                    <input
-                                                        type="text"
-                                                        value={editingItem.rlc_event_pretitle || ''}
-                                                        onChange={(e) => setEditingItem({ ...editingItem, rlc_event_pretitle: e.target.value })}
-                                                        className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-primary font-bold focus:border-secondary outline-none shadow-sm"
-                                                        placeholder="EJ: CONGRESO 2024"
-                                                    />
-                                                </div>
-                                                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
-                                                    <label className="block text-[11px] uppercase font-black tracking-widest text-slate-500 mb-4">Sub-título (Lema/Tema)</label>
-                                                    <input
-                                                        type="text"
-                                                        value={editingItem.rlc_event_subtitle || ''}
-                                                        onChange={(e) => setEditingItem({ ...editingItem, rlc_event_subtitle: e.target.value })}
-                                                        className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-primary font-bold focus:border-secondary outline-none shadow-sm"
-                                                        placeholder="EJ: El futuro de la IA"
-                                                    />
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {(activeTab === 'eventos' || editingItem.sku?.startsWith('EVT-')) && (
-                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                                                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
-                                                    <label className="block text-[11px] uppercase font-black tracking-widest text-slate-500 mb-4">Fecha</label>
-                                                    <input
-                                                        type="date"
-                                                        value={editingItem.rlc_event_date || ''}
-                                                        onChange={(e) => setEditingItem({ ...editingItem, rlc_event_date: e.target.value })}
-                                                        className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-primary font-bold focus:border-secondary outline-none shadow-sm"
-                                                    />
-                                                </div>
-                                                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
-                                                    <label className="block text-[11px] uppercase font-black tracking-widest text-slate-500 mb-4">Hora (UTC)</label>
-                                                    <input
-                                                        type="time"
-                                                        value={editingItem.rlc_event_time || ''}
-                                                        onChange={(e) => setEditingItem({ ...editingItem, rlc_event_time: e.target.value })}
-                                                        className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-primary font-bold focus:border-secondary outline-none shadow-sm"
-                                                    />
-                                                </div>
-                                                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
-                                                    <label className="block text-[11px] uppercase font-black tracking-widest text-slate-500 mb-4">Ubicación / Link</label>
-                                                    <input
-                                                        type="text"
-                                                        value={editingItem.rlc_event_location || ''}
-                                                        onChange={(e) => setEditingItem({ ...editingItem, rlc_event_location: e.target.value })}
-                                                        className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-primary font-bold focus:border-secondary outline-none shadow-sm"
-                                                        placeholder="Online / Sala Zoom"
-                                                    />
-                                                </div>
-                                                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col justify-center">
-                                                    <label className="flex items-center gap-4 cursor-pointer">
-                                                        <div className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none bg-slate-200"
-                                                            onClick={() => setEditingItem({ ...editingItem, rlc_event_is_featured: !editingItem.rlc_event_is_featured })}
-                                                            style={{ backgroundColor: editingItem.rlc_event_is_featured ? '#F6A800' : '#E2E8F0' }}>
-                                                            <span className="sr-only">Destacado</span>
-                                                            <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${editingItem.rlc_event_is_featured ? 'translate-x-5' : 'translate-x-0'}`} />
-                                                        </div>
-                                                        <span className="text-[11px] uppercase font-black tracking-widest text-slate-500">Evento Destacado (Home)</span>
-                                                    </label>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {(activeTab === 'eventos' || editingItem.sku?.startsWith('EVT-')) && (
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
-                                                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm relative group">
-                                                    <div className="flex justify-between items-start mb-6">
-                                                        <div>
-                                                            <h4 className="text-lg font-black text-primary tracking-tight">Programa del Evento</h4>
-                                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Temario, exponentes, horarios y actividades detalladas</p>
-                                                        </div>
-                                                        <button
-                                                            type="button"
-                                                            onClick={handleAIFormatProgram}
-                                                            disabled={aiLoading.program || !editingItem.rlc_event_program}
-                                                            className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-secondary hover:text-primary transition-all shadow-lg active:scale-95 disabled:opacity-50"
-                                                        >
-                                                            <span className={`material-symbols-outlined text-sm ${aiLoading.program ? 'animate-spin' : ''}`}>
-                                                                {aiLoading.program ? 'sync' : 'auto_fix_high'}
-                                                            </span>
-                                                            {aiLoading.program ? 'Procesando...' : 'IA Magic'}
-                                                        </button>
+                                            {(activeTab === 'eventos' || editingItem.sku?.startsWith('EVT-')) && (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
+                                                    <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+                                                        <label className="block text-[11px] uppercase font-black tracking-widest text-slate-500 mb-4">Pre-título (ej: Evento Anual)</label>
+                                                        <input
+                                                            type="text"
+                                                            value={editingItem.rlc_event_pretitle || ''}
+                                                            onChange={(e) => setEditingItem({ ...editingItem, rlc_event_pretitle: e.target.value })}
+                                                            className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-primary font-bold focus:border-secondary outline-none shadow-sm"
+                                                            placeholder="EJ: CONGRESO 2024"
+                                                        />
                                                     </div>
-                                                    <textarea
-                                                        value={editingItem.rlc_event_program || ''}
-                                                        onChange={(e) => setEditingItem({ ...editingItem, rlc_event_program: e.target.value })}
-                                                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-primary font-mono text-xs focus:border-secondary transition-all outline-none shadow-inner min-h-[150px]"
-                                                        placeholder='[{"time": "09:00", "activity": "Bienvenida"}]'
-                                                    />
-                                                </div>
-                                                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm relative group">
-                                                    <div className="flex justify-between items-start mb-6">
-                                                        <div>
-                                                            <h4 className="text-lg font-black text-primary tracking-tight">Objetivos del Evento</h4>
-                                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">¿Qué debe esperar el suscriptor de este evento? Metas y alcances</p>
-                                                        </div>
-                                                        <button
-                                                            type="button"
-                                                            onClick={handleAIFormatObjectives}
-                                                            disabled={aiLoading.objectives || !editingItem.rlc_event_objectives}
-                                                            className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-secondary hover:text-primary transition-all shadow-lg active:scale-95 disabled:opacity-50"
-                                                        >
-                                                            <span className={`material-symbols-outlined text-sm ${aiLoading.objectives ? 'animate-spin' : ''}`}>
-                                                                {aiLoading.objectives ? 'sync' : 'auto_fix_high'}
-                                                            </span>
-                                                            {aiLoading.objectives ? 'Procesando...' : 'IA Magic'}
-                                                        </button>
+                                                    <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+                                                        <label className="block text-[11px] uppercase font-black tracking-widest text-slate-500 mb-4">Sub-título (Lema/Tema)</label>
+                                                        <input
+                                                            type="text"
+                                                            value={editingItem.rlc_event_subtitle || ''}
+                                                            onChange={(e) => setEditingItem({ ...editingItem, rlc_event_subtitle: e.target.value })}
+                                                            className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-primary font-bold focus:border-secondary outline-none shadow-sm"
+                                                            placeholder="EJ: El futuro de la IA"
+                                                        />
                                                     </div>
-                                                    <textarea
-                                                        value={editingItem.rlc_event_objectives || ''}
-                                                        onChange={(e) => setEditingItem({ ...editingItem, rlc_event_objectives: e.target.value })}
-                                                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-primary font-mono text-xs focus:border-secondary transition-all outline-none shadow-inner min-h-[150px]"
-                                                        placeholder='["Objetivo 1", "Objetivo 2"]'
-                                                    />
                                                 </div>
-                                                <div className="md:col-span-2 bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
-                                                    <label className="block text-[11px] uppercase font-black tracking-widest text-slate-500 mb-4">Descripción Corta del Programa</label>
-                                                    <input
-                                                        type="text"
-                                                        value={editingItem.rlc_event_program_desc || ''}
-                                                        onChange={(e) => setEditingItem({ ...editingItem, rlc_event_program_desc: e.target.value })}
-                                                        className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-primary font-bold focus:border-secondary outline-none shadow-sm"
-                                                        placeholder="EJ: Un recorrido por las mejores prácticas..."
-                                                    />
+                                            )}
+
+                                            {(activeTab === 'eventos' || editingItem.sku?.startsWith('EVT-')) && (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                                                    <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+                                                        <label className="block text-[11px] uppercase font-black tracking-widest text-slate-500 mb-4">Fecha</label>
+                                                        <input
+                                                            type="date"
+                                                            value={editingItem.rlc_event_date || ''}
+                                                            onChange={(e) => setEditingItem({ ...editingItem, rlc_event_date: e.target.value })}
+                                                            className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-primary font-bold focus:border-secondary outline-none shadow-sm"
+                                                        />
+                                                    </div>
+                                                    <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+                                                        <label className="block text-[11px] uppercase font-black tracking-widest text-slate-500 mb-4">Hora (UTC)</label>
+                                                        <input
+                                                            type="time"
+                                                            value={editingItem.rlc_event_time || ''}
+                                                            onChange={(e) => setEditingItem({ ...editingItem, rlc_event_time: e.target.value })}
+                                                            className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-primary font-bold focus:border-secondary outline-none shadow-sm"
+                                                        />
+                                                    </div>
+                                                    <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+                                                        <label className="block text-[11px] uppercase font-black tracking-widest text-slate-500 mb-4">Ubicación / Link</label>
+                                                        <input
+                                                            type="text"
+                                                            value={editingItem.rlc_event_location || ''}
+                                                            onChange={(e) => setEditingItem({ ...editingItem, rlc_event_location: e.target.value })}
+                                                            className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-primary font-bold focus:border-secondary outline-none shadow-sm"
+                                                            placeholder="Online / Sala Zoom"
+                                                        />
+                                                    </div>
+                                                    <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col justify-center">
+                                                        <label className="flex items-center gap-4 cursor-pointer">
+                                                            <div className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none bg-slate-200"
+                                                                onClick={() => setEditingItem({ ...editingItem, rlc_event_is_featured: !editingItem.rlc_event_is_featured })}
+                                                                style={{ backgroundColor: editingItem.rlc_event_is_featured ? '#F6A800' : '#E2E8F0' }}>
+                                                                <span className="sr-only">Destacado</span>
+                                                                <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${editingItem.rlc_event_is_featured ? 'translate-x-5' : 'translate-x-0'}`} />
+                                                            </div>
+                                                            <span className="text-[11px] uppercase font-black tracking-widest text-slate-500">Evento Destacado (Home)</span>
+                                                        </label>
+                                                    </div>
                                                 </div>
+                                            )}
+
+                                            {(activeTab === 'eventos' || editingItem.sku?.startsWith('EVT-')) && (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
+                                                    <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm relative group">
+                                                        <div className="flex justify-between items-start mb-6">
+                                                            <div>
+                                                                <h4 className="text-lg font-black text-primary tracking-tight">Programa del Evento</h4>
+                                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Temario, exponentes, horarios y actividades detalladas</p>
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                onClick={handleAIFormatProgram}
+                                                                disabled={aiLoading.program || !editingItem.rlc_event_program}
+                                                                className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-secondary hover:text-primary transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                                                            >
+                                                                <span className={`material-symbols-outlined text-sm ${aiLoading.program ? 'animate-spin' : ''}`}>
+                                                                    {aiLoading.program ? 'sync' : 'auto_fix_high'}
+                                                                </span>
+                                                                {aiLoading.program ? 'Procesando...' : 'IA Magic'}
+                                                            </button>
+                                                        </div>
+                                                        <textarea
+                                                            value={editingItem.rlc_event_program || ''}
+                                                            onChange={(e) => setEditingItem({ ...editingItem, rlc_event_program: e.target.value })}
+                                                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-primary font-mono text-xs focus:border-secondary transition-all outline-none shadow-inner min-h-[150px]"
+                                                            placeholder='[{"time": "09:00", "activity": "Bienvenida"}]'
+                                                        />
+                                                    </div>
+                                                    <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm relative group">
+                                                        <div className="flex justify-between items-start mb-6">
+                                                            <div>
+                                                                <h4 className="text-lg font-black text-primary tracking-tight">Objetivos del Evento</h4>
+                                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">¿Qué debe esperar el suscriptor de este evento? Metas y alcances</p>
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                onClick={handleAIFormatObjectives}
+                                                                disabled={aiLoading.objectives || !editingItem.rlc_event_objectives}
+                                                                className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-secondary hover:text-primary transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                                                            >
+                                                                <span className={`material-symbols-outlined text-sm ${aiLoading.objectives ? 'animate-spin' : ''}`}>
+                                                                    {aiLoading.objectives ? 'sync' : 'auto_fix_high'}
+                                                                </span>
+                                                                {aiLoading.objectives ? 'Procesando...' : 'IA Magic'}
+                                                            </button>
+                                                        </div>
+                                                        <textarea
+                                                            value={editingItem.rlc_event_objectives || ''}
+                                                            onChange={(e) => setEditingItem({ ...editingItem, rlc_event_objectives: e.target.value })}
+                                                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-primary font-mono text-xs focus:border-secondary transition-all outline-none shadow-inner min-h-[150px]"
+                                                            placeholder='["Objetivo 1", "Objetivo 2"]'
+                                                        />
+                                                    </div>
+                                                    <div className="md:col-span-2 bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+                                                        <label className="block text-[11px] uppercase font-black tracking-widest text-slate-500 mb-4">Descripción Corta del Programa</label>
+                                                        <input
+                                                            type="text"
+                                                            value={editingItem.rlc_event_program_desc || ''}
+                                                            onChange={(e) => setEditingItem({ ...editingItem, rlc_event_program_desc: e.target.value })}
+                                                            className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-primary font-bold focus:border-secondary outline-none shadow-sm"
+                                                            placeholder="EJ: Un recorrido por las mejores prácticas..."
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {/* Sección: Metadatos Específicos (No Productos) */}
+                                            {!isProduct && activeTab === 'recursos' && (
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                                    <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+                                                        <label className="block text-[11px] uppercase font-black tracking-widest text-slate-500 mb-4">Recurso (Subir o URL)</label>
+                                                        <div className="flex gap-3">
+                                                            <div className="relative flex-grow">
+                                                                <input
+                                                                    type="text"
+                                                                    value={editingItem.url || editingItem.rlc_resource_url || ''}
+                                                                    onChange={(e) => setEditingItem({ ...editingItem, url: e.target.value, rlc_resource_url: e.target.value })}
+                                                                    className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-primary font-bold focus:border-secondary transition-all outline-none text-sm pr-12"
+                                                                    placeholder="Enlace o adjunto..."
+                                                                />
+                                                                <label className="absolute right-2 top-2 bottom-2 aspect-square bg-secondary text-primary rounded-xl cursor-pointer hover:scale-105 transition-all flex items-center justify-center shadow-lg active:scale-95">
+                                                                    <input type="file" className="hidden" onChange={(e) => { setMediaTarget('resource_url'); handleMediaUpload(e, 'resource_url'); }} disabled={mediaUpload.loading} />
+                                                                    <span className="material-symbols-outlined text-lg">{mediaUpload.loading && mediaTarget === 'resource_url' ? 'sync' : 'attach_file'}</span>
+                                                                </label>
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleOpenMediaLibrary('resource_url')}
+                                                                className="px-4 bg-slate-100 text-slate-400 rounded-2xl hover:text-primary transition-colors flex items-center justify-center"
+                                                            >
+                                                                <span className="material-symbols-outlined">perm_media</span>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+                                                        <label className="block text-[11px] uppercase font-black tracking-widest text-slate-500 mb-4">Tipo</label>
+                                                        <select
+                                                            value={editingItem.type || editingItem.rlc_resource_type || 'PDF'}
+                                                            onChange={(e) => setEditingItem({ ...editingItem, type: e.target.value })}
+                                                            className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-primary font-bold focus:border-secondary outline-none appearance-none cursor-pointer"
+                                                        >
+                                                            <option value="PDF">PDF (Documento)</option>
+                                                            <option value="Video">Video (YouTube/vimeo)</option>
+                                                            <option value="DOCX">Word (Plantilla)</option>
+                                                            <option value="XLSX">Excel (Rúbrica)</option>
+                                                            <option value="LINK">Link Externo</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm col-span-1 md:col-span-3">
+                                                        <div className="flex flex-col md:flex-row gap-8 items-start">
+                                                            <div className="flex-1 w-full">
+                                                                <label className="block text-[11px] uppercase font-black tracking-widest text-slate-500 mb-4">Categorías</label>
+                                                                <div className="flex flex-wrap gap-2 mb-4">
+                                                                    {resourceCategories.map(cat => {
+                                                                        const catId = cat.term_id || cat.id;
+                                                                        const isSelected = (editingItem.categories || []).includes(catId);
+                                                                        return (
+                                                                            <button
+                                                                                key={catId}
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    const cats = editingItem.categories || [];
+                                                                                    if (cats.includes(catId)) {
+                                                                                        setEditingItem({ ...editingItem, categories: cats.filter((id: number) => id !== catId) });
+                                                                                    } else {
+                                                                                        setEditingItem({ ...editingItem, categories: [...cats, catId] });
+                                                                                    }
+                                                                                }}
+                                                                                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${isSelected
+                                                                                    ? 'bg-secondary text-primary border-2 border-secondary'
+                                                                                    : 'bg-slate-50 text-slate-400 border-2 border-slate-100 hover:border-slate-200'
+                                                                                    }`}
+                                                                            >
+                                                                                {cat.name}
+                                                                            </button>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            </div>
+                                                            <div className="w-full md:w-64 bg-slate-50 p-4 rounded-3xl border border-slate-100">
+                                                                <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Nueva Categoría</label>
+                                                                <div className="flex gap-2">
+                                                                    <input
+                                                                        type="text"
+                                                                        value={newCategoryName}
+                                                                        onChange={(e) => setNewCategoryName(e.target.value)}
+                                                                        className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-secondary transition-all"
+                                                                        placeholder="Nombre..."
+                                                                    />
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={handleCreateCategory}
+                                                                        disabled={isCreatingCategory || !newCategoryName.trim()}
+                                                                        className="bg-primary text-white p-2 rounded-xl hover:bg-secondary transition-colors disabled:opacity-50"
+                                                                    >
+                                                                        <span className="material-symbols-outlined text-sm">add</span>
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col justify-center">
+                                                        <label className="flex items-center gap-4 cursor-pointer">
+                                                            <div className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none bg-slate-200"
+                                                                onClick={() => setEditingItem({ ...editingItem, is_premium: !editingItem.is_premium })}
+                                                                style={{ backgroundColor: editingItem.is_premium ? '#F6A800' : '#E2E8F0' }}>
+                                                                <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${editingItem.is_premium ? 'translate-x-5' : 'translate-x-0'}`} />
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-[11px] uppercase font-black tracking-widest text-primary">Contenido Premium</p>
+                                                                <p className="text-[10px] text-slate-400 font-bold">Solo para socios</p>
+                                                            </div>
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </section>
+
+                                        {/* Sección: Imagen Destacada */}
+                                        <div className="bg-white p-8 md:p-12 rounded-[3rem] border border-slate-200 shadow-sm space-y-8">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <label className="text-[11px] uppercase font-black tracking-widest text-slate-500 ml-1">Imagen de Portada / Miniatura</label>
+                                                {mediaUpload.loading && <span className="flex items-center gap-2 text-[10px] font-bold text-secondary animate-pulse uppercase tracking-widest"><span className="material-symbols-outlined text-sm animate-spin">sync</span> Procesando imagen...</span>}
                                             </div>
-                                        )}
-                                        {/* Sección: Metadatos Específicos (No Productos) */}
-                                        {!isProduct && activeTab === 'recursos' && (
-                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                                                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
-                                                    <label className="block text-[11px] uppercase font-black tracking-widest text-slate-500 mb-4">Recurso (Subir o URL)</label>
-                                                    <div className="flex gap-3">
+
+                                            <div className="flex flex-col lg:flex-row gap-10 items-stretch">
+                                                <div className="w-full lg:w-5/12 space-y-6 flex flex-col justify-center">
+                                                    <div className="flex gap-3 mt-2">
                                                         <div className="relative flex-grow">
                                                             <input
                                                                 type="text"
-                                                                value={editingItem.url || editingItem.rlc_resource_url || ''}
-                                                                onChange={(e) => setEditingItem({ ...editingItem, url: e.target.value, rlc_resource_url: e.target.value })}
-                                                                className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-primary font-bold focus:border-secondary transition-all outline-none text-sm pr-12"
-                                                                placeholder="Enlace o adjunto..."
+                                                                value={editingItem.featured_media_url || ''}
+                                                                onChange={(e) => setEditingItem({ ...editingItem, featured_media_url: e.target.value })}
+                                                                className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-primary focus:border-secondary outline-none transition-all text-xs font-mono pr-16 shadow-sm"
+                                                                placeholder="URL de imagen externa..."
                                                             />
-                                                            <label className="absolute right-2 top-2 bottom-2 aspect-square bg-secondary text-primary rounded-xl cursor-pointer hover:scale-105 transition-all flex items-center justify-center shadow-lg active:scale-95">
-                                                                <input type="file" className="hidden" onChange={(e) => { setMediaTarget('resource_url'); handleMediaUpload(e); }} disabled={mediaUpload.loading} />
-                                                                <span className="material-symbols-outlined text-lg">{mediaUpload.loading && mediaTarget === 'resource_url' ? 'sync' : 'attach_file'}</span>
+                                                            <label
+                                                                className="absolute right-2 top-2 bottom-2 aspect-square bg-secondary text-primary rounded-xl cursor-pointer hover:scale-105 transition-all flex items-center justify-center shadow-lg shadow-secondary/20 active:scale-95"
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            >
+                                                                <input
+                                                                    type="file"
+                                                                    className="hidden"
+                                                                    accept="image/*"
+                                                                    onChange={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleMediaUpload(e, 'featured_media');
+                                                                    }}
+                                                                    disabled={mediaUpload.loading}
+                                                                />
+                                                                <span className="material-symbols-outlined text-xl">{mediaUpload.loading ? 'sync' : 'add_photo_alternate'}</span>
                                                             </label>
                                                         </div>
                                                         <button
                                                             type="button"
-                                                            onClick={() => handleOpenMediaLibrary('resource_url')}
-                                                            className="px-4 bg-slate-100 text-slate-400 rounded-2xl hover:text-primary transition-colors flex items-center justify-center"
+                                                            onClick={handleOpenMediaLibrary}
+                                                            className="px-4 bg-slate-900 text-white rounded-2xl hover:bg-black transition-colors flex items-center justify-center shadow-lg active:scale-95"
+                                                            title="Explorar Biblioteca"
                                                         >
                                                             <span className="material-symbols-outlined">perm_media</span>
                                                         </button>
                                                     </div>
-                                                </div>
-                                                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
-                                                    <label className="block text-[11px] uppercase font-black tracking-widest text-slate-500 mb-4">Tipo</label>
-                                                    <select
-                                                        value={editingItem.type || editingItem.rlc_resource_type || 'PDF'}
-                                                        onChange={(e) => setEditingItem({ ...editingItem, type: e.target.value })}
-                                                        className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-primary font-bold focus:border-secondary outline-none appearance-none cursor-pointer"
-                                                    >
-                                                        <option value="PDF">PDF (Documento)</option>
-                                                        <option value="Video">Video (YouTube/vimeo)</option>
-                                                        <option value="DOCX">Word (Plantilla)</option>
-                                                        <option value="XLSX">Excel (Rúbrica)</option>
-                                                        <option value="LINK">Link Externo</option>
-                                                    </select>
+                                                    {mediaUpload.error && <p className="bg-red-500/10 text-red-500 p-4 rounded-xl text-[10px] font-bold border border-red-500/20 uppercase tracking-wider">{mediaUpload.error}</p>}
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 shadow-inner">
+                                                            <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Formato</p>
+                                                            <p className="text-[10px] text-primary font-bold">JPG, PNG o WebP</p>
+                                                        </div>
+                                                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 shadow-inner">
+                                                            <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Recomendado</p>
+                                                            <p className="text-[10px] text-primary font-bold">1200 x 630 px</p>
+                                                        </div>
+                                                    </div>
                                                 </div>
 
-                                                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm col-span-1 md:col-span-3">
-                                                    <div className="flex flex-col md:flex-row gap-8 items-start">
-                                                        <div className="flex-1 w-full">
-                                                            <label className="block text-[11px] uppercase font-black tracking-widest text-slate-500 mb-4">Categorías</label>
-                                                            <div className="flex flex-wrap gap-2 mb-4">
-                                                                {resourceCategories.map(cat => {
-                                                                    const catId = cat.term_id || cat.id;
-                                                                    const isSelected = (editingItem.categories || []).includes(catId);
-                                                                    return (
-                                                                        <button
-                                                                            key={catId}
-                                                                            type="button"
-                                                                            onClick={() => {
-                                                                                const cats = editingItem.categories || [];
-                                                                                if (cats.includes(catId)) {
-                                                                                    setEditingItem({ ...editingItem, categories: cats.filter((id: number) => id !== catId) });
-                                                                                } else {
-                                                                                    setEditingItem({ ...editingItem, categories: [...cats, catId] });
-                                                                                }
-                                                                            }}
-                                                                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${isSelected
-                                                                                ? 'bg-secondary text-primary border-2 border-secondary'
-                                                                                : 'bg-slate-50 text-slate-400 border-2 border-slate-100 hover:border-slate-200'
-                                                                                }`}
-                                                                        >
-                                                                            {cat.name}
-                                                                        </button>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        </div>
-                                                        <div className="w-full md:w-64 bg-slate-50 p-4 rounded-3xl border border-slate-100">
-                                                            <label className="block text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest">Nueva Categoría</label>
-                                                            <div className="flex gap-2">
-                                                                <input
-                                                                    type="text"
-                                                                    value={newCategoryName}
-                                                                    onChange={(e) => setNewCategoryName(e.target.value)}
-                                                                    className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-secondary transition-all"
-                                                                    placeholder="Nombre..."
-                                                                />
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={handleCreateCategory}
-                                                                    disabled={isCreatingCategory || !newCategoryName.trim()}
-                                                                    className="bg-primary text-white p-2 rounded-xl hover:bg-secondary transition-colors disabled:opacity-50"
-                                                                >
-                                                                    <span className="material-symbols-outlined text-sm">add</span>
+                                                <div className="flex-grow aspect-video bg-slate-100 rounded-[2rem] border-2 border-dashed border-slate-200 overflow-hidden relative group shadow-inner">
+                                                    {resolveImageUrl(editingItem) ? (
+                                                        <>
+                                                            <img src={resolveImageUrl(editingItem)} alt="Portada" className="w-full h-full object-cover transition-all duration-700 group-hover:scale-110 group-hover:blur-sm" />
+                                                            <div className="absolute inset-0 bg-slate-100/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                                                                <button onClick={() => setEditingItem({ ...editingItem, featured_media_url: '' })} className="bg-red-500 text-white p-4 rounded-full hover:scale-110 transition-transform shadow-xl">
+                                                                    <span className="material-symbols-outlined">delete_sweep</span>
                                                                 </button>
                                                             </div>
+                                                        </>
+                                                    ) : (
+                                                        <div className="h-full flex flex-col items-center justify-center text-slate-700">
+                                                            <span className="material-symbols-outlined text-6xl mb-4 opacity-20">image</span>
+                                                            <p className="text-[11px] font-black uppercase tracking-[0.3em]">Vista previa pendiente</p>
                                                         </div>
-                                                    </div>
-                                                </div>
-                                                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col justify-center">
-                                                    <label className="flex items-center gap-4 cursor-pointer">
-                                                        <div className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none bg-slate-200"
-                                                            onClick={() => setEditingItem({ ...editingItem, is_premium: !editingItem.is_premium })}
-                                                            style={{ backgroundColor: editingItem.is_premium ? '#F6A800' : '#E2E8F0' }}>
-                                                            <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${editingItem.is_premium ? 'translate-x-5' : 'translate-x-0'}`} />
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-[11px] uppercase font-black tracking-widest text-primary">Contenido Premium</p>
-                                                            <p className="text-[10px] text-slate-400 font-bold">Solo para socios</p>
-                                                        </div>
-                                                    </label>
+                                                    )}
                                                 </div>
                                             </div>
-                                        )}
-                                    </section>
-
-                                    {/* Sección: Imagen Destacada */}
-                                    <div className="bg-white p-8 md:p-12 rounded-[3rem] border border-slate-200 shadow-sm space-y-8">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <label className="text-[11px] uppercase font-black tracking-widest text-slate-500 ml-1">Imagen de Portada / Miniatura</label>
-                                            {mediaUpload.loading && <span className="flex items-center gap-2 text-[10px] font-bold text-secondary animate-pulse uppercase tracking-widest"><span className="material-symbols-outlined text-sm animate-spin">sync</span> Procesando imagen...</span>}
                                         </div>
 
-                                        <div className="flex flex-col lg:flex-row gap-10 items-stretch">
-                                            <div className="w-full lg:w-5/12 space-y-6 flex flex-col justify-center">
-                                                <div className="flex gap-3 mt-2">
-                                                    <div className="relative flex-grow">
-                                                        <input
-                                                            type="text"
-                                                            value={editingItem.featured_media_url || ''}
-                                                            onChange={(e) => setEditingItem({ ...editingItem, featured_media_url: e.target.value })}
-                                                            className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-primary focus:border-secondary outline-none transition-all text-xs font-mono pr-16 shadow-sm"
-                                                            placeholder="URL de imagen externa..."
-                                                        />
-                                                        <label className="absolute right-2 top-2 bottom-2 aspect-square bg-secondary text-primary rounded-xl cursor-pointer hover:scale-105 transition-all flex items-center justify-center shadow-lg shadow-secondary/20 active:scale-95">
-                                                            <input type="file" className="hidden" accept="image/*" onChange={handleMediaUpload} disabled={mediaUpload.loading} />
-                                                            <span className="material-symbols-outlined text-xl">{mediaUpload.loading ? 'sync' : 'add_photo_alternate'}</span>
-                                                        </label>
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={handleOpenMediaLibrary}
-                                                        className="px-4 bg-slate-900 text-white rounded-2xl hover:bg-black transition-colors flex items-center justify-center shadow-lg active:scale-95"
-                                                        title="Explorar Biblioteca"
-                                                    >
-                                                        <span className="material-symbols-outlined">perm_media</span>
-                                                    </button>
-                                                </div>
-                                                {mediaUpload.error && <p className="bg-red-500/10 text-red-500 p-4 rounded-xl text-[10px] font-bold border border-red-500/20 uppercase tracking-wider">{mediaUpload.error}</p>}
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 shadow-inner">
-                                                        <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Formato</p>
-                                                        <p className="text-[10px] text-primary font-bold">JPG, PNG o WebP</p>
-                                                    </div>
-                                                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 shadow-inner">
-                                                        <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Recomendado</p>
-                                                        <p className="text-[10px] text-primary font-bold">1200 x 630 px</p>
-                                                    </div>
-                                                </div>
+                                        {/* Sección: Cuerpo del Contenido */}
+                                        <section className="bg-white p-8 md:p-12 rounded-[3rem] border border-slate-200 shadow-sm space-y-6">
+                                            <div className="flex items-center justify-between mb-4 px-2">
+                                                <label className="text-[11px] uppercase font-black tracking-widest text-slate-500">Cuerpo del Contenido / Detalles</label>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleAIFormatContent}
+                                                    disabled={aiLoading.content}
+                                                    className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-secondary hover:text-primary transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                                                >
+                                                    <span className={`material-symbols-outlined text-sm ${aiLoading.content ? 'animate-spin' : ''}`}>
+                                                        {aiLoading.content ? 'sync' : 'auto_fix'}
+                                                    </span>
+                                                    {aiLoading.content ? 'Estructurando...' : (activeTab === 'membresias' ? 'IA: Generar Beneficios' : 'IA: Mejorar Formato')}
+                                                </button>
                                             </div>
-
-                                            <div className="flex-grow aspect-video bg-slate-100 rounded-[2rem] border-2 border-dashed border-slate-200 overflow-hidden relative group shadow-inner">
-                                                {resolveImageUrl(editingItem) ? (
-                                                    <>
-                                                        <img src={resolveImageUrl(editingItem)} alt="Portada" className="w-full h-full object-cover transition-all duration-700 group-hover:scale-110 group-hover:blur-sm" />
-                                                        <div className="absolute inset-0 bg-slate-100/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
-                                                            <button onClick={() => setEditingItem({ ...editingItem, featured_media_url: '' })} className="bg-red-500 text-white p-4 rounded-full hover:scale-110 transition-transform shadow-xl">
-                                                                <span className="material-symbols-outlined">delete_sweep</span>
-                                                            </button>
-                                                        </div>
-                                                    </>
-                                                ) : (
-                                                    <div className="h-full flex flex-col items-center justify-center text-slate-700">
-                                                        <span className="material-symbols-outlined text-6xl mb-4 opacity-20">image</span>
-                                                        <p className="text-[11px] font-black uppercase tracking-[0.3em]">Vista previa pendiente</p>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Sección: Cuerpo del Contenido */}
-                                    <section className="bg-white p-8 md:p-12 rounded-[3rem] border border-slate-200 shadow-sm space-y-6">
-                                        <div className="flex items-center justify-between mb-4 px-2">
-                                            <label className="text-[11px] uppercase font-black tracking-widest text-slate-500">Cuerpo del Contenido / Detalles</label>
-                                            <button
-                                                type="button"
-                                                onClick={handleAIFormatContent}
-                                                disabled={aiLoading.content}
-                                                className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-secondary hover:text-primary transition-all shadow-lg active:scale-95 disabled:opacity-50"
-                                            >
-                                                <span className={`material-symbols-outlined text-sm ${aiLoading.content ? 'animate-spin' : ''}`}>
-                                                    {aiLoading.content ? 'sync' : 'auto_fix'}
-                                                </span>
-                                                {aiLoading.content ? 'Estructurando...' : (activeTab === 'membresias' ? 'IA: Generar Beneficios' : 'IA: Mejorar Formato')}
-                                            </button>
-                                        </div>
-                                        {isProduct ? (
-                                            <textarea
-                                                rows={10}
-                                                value={editingItem.description || ''}
-                                                onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
-                                                className="w-full bg-white border border-slate-200 rounded-3xl px-8 py-8 text-primary focus:border-secondary outline-none transition-all font-mono text-base leading-relaxed shadow-sm min-h-[400px]"
-                                                placeholder="Escribe la descripción detallada del plan..."
-                                                required
-                                            />
-                                        ) : (
-                                            <div className="bg-white rounded-[2.5rem] overflow-hidden border-8 border-white shadow-2xl">
-                                                <ReactQuill
-                                                    theme="snow"
-                                                    value={editingItem.content?.rendered || editingItem.content || ''}
-                                                    onChange={(content) => setEditingItem({ ...editingItem, content })}
-                                                    className="h-[600px] text-slate-900 editor-custom-full"
-                                                    modules={{
-                                                        toolbar: [
-                                                            [{ 'header': [1, 2, 3, 4, false] }],
-                                                            ['bold', 'italic', 'underline', 'strike'],
-                                                            [{ 'color': [] }, { 'background': [] }],
-                                                            [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-                                                            [{ 'align': [] }],
-                                                            ['link', 'image', 'video'],
-                                                            ['blockquote', 'code-block'],
-                                                            ['clean']
-                                                        ],
-                                                    }}
+                                            {isProduct ? (
+                                                <textarea
+                                                    rows={10}
+                                                    value={editingItem.description || ''}
+                                                    onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
+                                                    className="w-full bg-white border border-slate-200 rounded-3xl px-8 py-8 text-primary focus:border-secondary outline-none transition-all font-mono text-base leading-relaxed shadow-sm min-h-[400px]"
+                                                    placeholder="Escribe la descripción detallada del plan..."
+                                                    required
                                                 />
-                                                <div className="h-10 bg-slate-50 border-t border-slate-100"></div>
-                                            </div>
-                                        )}
-                                    </section>
+                                            ) : (
+                                                <div className="bg-white rounded-[2.5rem] overflow-hidden border-8 border-white shadow-2xl">
+                                                    <ReactQuill
+                                                        theme="snow"
+                                                        value={editingItem.content?.rendered || editingItem.content || ''}
+                                                        onChange={(content) => setEditingItem({ ...editingItem, content })}
+                                                        className="h-[600px] text-slate-900 editor-custom-full"
+                                                        modules={{
+                                                            toolbar: [
+                                                                [{ 'header': [1, 2, 3, 4, false] }],
+                                                                ['bold', 'italic', 'underline', 'strike'],
+                                                                [{ 'color': [] }, { 'background': [] }],
+                                                                [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                                                                [{ 'align': [] }],
+                                                                ['link', 'image', 'video'],
+                                                                ['blockquote', 'code-block'],
+                                                                ['clean']
+                                                            ],
+                                                        }}
+                                                    />
+                                                    <div className="h-10 bg-slate-50 border-t border-slate-100"></div>
+                                                </div>
+                                            )}
+                                        </section>
 
-                                    {/* Sección: SEO / Metadatos (Placeholder para expansión futura) */}
-                                    <div className="pt-10 border-t border-slate-100 flex justify-center">
-                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.4em]">Fin del área de edición · Red LatAm COIL CMS</p>
+                                        {/* Sección: SEO / Metadatos (Placeholder para expansión futura) */}
+                                        <div className="pt-10 border-t border-slate-100 flex justify-center">
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.4em]">Fin del área de edición · Red LatAm COIL CMS</p>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        </form>
-                    </div>
-                )}
+                            </form>
+                        </div>
+                    )
+                }
 
                 {/* Modal: Asignación Manual / Crear Usuario */}
-                {showManualAssignModal && (
-                    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
-                        <div className="absolute inset-0 bg-primary/80 backdrop-blur-md" onClick={() => setShowManualAssignModal(false)}></div>
-                        <div className="relative bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/20">
-                            <div className="p-8 border-b border-slate-100 bg-slate-50/50">
-                                <div className="flex justify-between items-center mb-6">
-                                    <div>
-                                        <h3 className="text-xl font-black text-primary tracking-tight">Vincular Socio Manual</h3>
-                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Crear o activar membresías y eventos</p>
+                {
+                    showManualAssignModal && (
+                        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
+                            <div className="absolute inset-0 bg-primary/80 backdrop-blur-md" onClick={() => setShowManualAssignModal(false)}></div>
+                            <div className="relative bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/20">
+                                <div className="p-8 border-b border-slate-100 bg-slate-50/50">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <div>
+                                            <h3 className="text-xl font-black text-primary tracking-tight">Vincular Socio Manual</h3>
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Crear o activar membresías y eventos</p>
+                                        </div>
+                                        <button onClick={() => setShowManualAssignModal(false)} className="w-10 h-10 rounded-full hover:bg-slate-200 transition-colors flex items-center justify-center text-slate-400">
+                                            <span className="material-symbols-outlined">close</span>
+                                        </button>
                                     </div>
-                                    <button onClick={() => setShowManualAssignModal(false)} className="w-10 h-10 rounded-full hover:bg-slate-200 transition-colors flex items-center justify-center text-slate-400">
+
+                                    <div className="flex bg-white p-1 rounded-2xl border border-slate-200 shadow-inner max-w-xs mx-auto">
+                                        <button
+                                            onClick={() => setManualAssignData({ ...manualAssignData, isNewUser: false })}
+                                            className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${!manualAssignData.isNewUser ? 'bg-primary text-white shadow-lg' : 'text-slate-400 hover:text-primary'}`}
+                                        >
+                                            Existente
+                                        </button>
+                                        <button
+                                            onClick={() => setManualAssignData({ ...manualAssignData, isNewUser: true })}
+                                            className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${manualAssignData.isNewUser ? 'bg-secondary text-primary shadow-lg' : 'text-slate-400 hover:text-secondary'}`}
+                                        >
+                                            Nuevo
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <form onSubmit={handleManualAssign} className="p-8 space-y-6">
+                                    {manualAssignData.isNewUser ? (
+                                        <>
+                                            <div>
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1 px-1">Nombre Completo</label>
+                                                <input
+                                                    type="text"
+                                                    value={manualAssignData.name}
+                                                    onChange={(e) => setManualAssignData({ ...manualAssignData, name: e.target.value })}
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-sm focus:border-secondary transition-all outline-none font-bold"
+                                                    placeholder="Ej: Juan Pérez"
+                                                    required
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1 px-1">Correo Electrónico</label>
+                                                <input
+                                                    type="email"
+                                                    value={manualAssignData.email}
+                                                    onChange={(e) => setManualAssignData({ ...manualAssignData, email: e.target.value })}
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-sm focus:border-secondary transition-all outline-none font-bold"
+                                                    placeholder="juan@universidad.edu"
+                                                    required
+                                                />
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 px-1">Seleccionar Usuario</label>
+                                            <select
+                                                value={manualAssignData.userId}
+                                                onChange={(e) => setManualAssignData({ ...manualAssignData, userId: e.target.value })}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-sm focus:border-secondary outline-none appearance-none cursor-pointer font-bold text-primary"
+                                                required
+                                            >
+                                                <option value="">Selecciona un usuario registrado...</option>
+                                                {members.map(m => (
+                                                    <option key={m.id} value={m.id}>{m.name} ({m.email})</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
+
+                                    <div className="space-y-4">
+                                        <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200">
+                                            <button
+                                                type="button"
+                                                onClick={() => setManualAssignData({ ...manualAssignData, productType: 'membership' })}
+                                                className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${manualAssignData.productType === 'membership' ? 'bg-white text-primary shadow-sm border border-slate-100' : 'text-slate-400'}`}
+                                            >
+                                                Membresía
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setManualAssignData({ ...manualAssignData, productType: 'event' })}
+                                                className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${manualAssignData.productType === 'event' ? 'bg-white text-secondary shadow-sm border border-slate-100' : 'text-slate-400'}`}
+                                            >
+                                                Evento
+                                            </button>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 px-1">
+                                                    {manualAssignData.productType === 'membership' ? 'Nivel' : 'Producto/Evento'}
+                                                </label>
+                                                <select
+                                                    value={manualAssignData.level}
+                                                    onChange={(e) => setManualAssignData({ ...manualAssignData, level: e.target.value })}
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-sm focus:border-secondary outline-none appearance-none cursor-pointer font-bold text-primary"
+                                                >
+                                                    {manualAssignData.productType === 'membership' ? (
+                                                        <>
+                                                            <option value="personal">Personal</option>
+                                                            <option value="institutional">Institucional</option>
+                                                        </>
+                                                    ) : (
+                                                        products
+                                                            .filter(p => p.sku?.startsWith('EVT-') || p.name?.toLowerCase().includes('evento') || p.name?.toLowerCase().includes('congreso'))
+                                                            .map(p => (
+                                                                <option key={p.id} value={p.name}>{p.name}</option>
+                                                            ))
+                                                    )}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 px-1">Vence el:</label>
+                                                <input
+                                                    type="date"
+                                                    value={manualAssignData.expiryDate}
+                                                    onChange={(e) => setManualAssignData({ ...manualAssignData, expiryDate: e.target.value })}
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-sm focus:border-secondary outline-none font-bold text-primary"
+                                                    required
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        type="submit"
+                                        disabled={isAssigning}
+                                        className="w-full bg-primary text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-secondary hover:text-primary transition-all shadow-xl shadow-primary/20 flex items-center justify-center gap-3 disabled:opacity-50"
+                                    >
+                                        {isAssigning ? (
+                                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                        ) : (
+                                            <span className="material-symbols-outlined">how_to_reg</span>
+                                        )}
+                                        {isAssigning ? 'Procesando...' : (manualAssignData.isNewUser ? 'Crear y Vincular' : 'Confirmar Asignación')}
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    )
+                }
+
+                {/* Modal: Detalle / Editor de Miembro */}
+                {
+                    showMemberDetailModal && selectedMember && (
+                        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
+                            <div className="absolute inset-0 bg-primary/80 backdrop-blur-md" onClick={() => setShowMemberDetailModal(false)}></div>
+                            <div className="relative bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden border border-white/20">
+                                <div className="p-10 border-b border-slate-100 flex justify-between items-start bg-slate-50/50">
+                                    <div className="flex gap-6 items-center">
+                                        <div className="w-20 h-20 rounded-[2rem] border-4 border-white shadow-xl overflow-hidden">
+                                            <img src={selectedMember.avatar} className="w-full h-full object-cover" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-2xl font-black text-primary tracking-tight">{selectedMember.name}</h3>
+                                            <p className="text-sm text-slate-400 font-bold">{selectedMember.email}</p>
+                                            <div className="flex gap-2 mt-2">
+                                                <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1 bg-primary/5 text-primary rounded-full border border-primary/10">ID: #{selectedMember.id}</span>
+                                                <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1 bg-green-50 text-green-500 rounded-full border border-green-100">{selectedMember.status}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setShowMemberDetailModal(false)} className="w-10 h-10 rounded-full hover:bg-slate-200 transition-colors flex items-center justify-center text-slate-400">
                                         <span className="material-symbols-outlined">close</span>
                                     </button>
                                 </div>
 
-                                <div className="flex bg-white p-1 rounded-2xl border border-slate-200 shadow-inner max-w-xs mx-auto">
-                                    <button
-                                        onClick={() => setManualAssignData({ ...manualAssignData, isNewUser: false })}
-                                        className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${!manualAssignData.isNewUser ? 'bg-primary text-white shadow-lg' : 'text-slate-400 hover:text-primary'}`}
-                                    >
-                                        Existente
-                                    </button>
-                                    <button
-                                        onClick={() => setManualAssignData({ ...manualAssignData, isNewUser: true })}
-                                        className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${manualAssignData.isNewUser ? 'bg-secondary text-primary shadow-lg' : 'text-slate-400 hover:text-secondary'}`}
-                                    >
-                                        Nuevo
-                                    </button>
-                                </div>
-                            </div>
-
-                            <form onSubmit={handleManualAssign} className="p-8 space-y-6">
-                                {manualAssignData.isNewUser ? (
-                                    <>
-                                        <div>
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1 px-1">Nombre Completo</label>
-                                            <input
-                                                type="text"
-                                                value={manualAssignData.name}
-                                                onChange={(e) => setManualAssignData({ ...manualAssignData, name: e.target.value })}
-                                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-sm focus:border-secondary transition-all outline-none font-bold"
-                                                placeholder="Ej: Juan Pérez"
-                                                required
-                                            />
+                                <div className="p-10 grid grid-cols-1 md:grid-cols-2 gap-10">
+                                    <div className="space-y-8">
+                                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-[18px]">verified_user</span>
+                                            Membresía Actual
+                                        </h4>
+                                        <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200">
+                                            <div className="flex justify-between items-center mb-4">
+                                                <span className="text-xs font-bold text-slate-500">Tipo:</span>
+                                                <span className="text-sm font-black text-primary capitalize">{selectedMember.membership_type}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center mb-4">
+                                                <span className="text-xs font-bold text-slate-500">Expira el:</span>
+                                                <span className="text-sm font-black text-secondary">{selectedMember.expiry}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-xs font-bold text-slate-500">Institución:</span>
+                                                <span className="text-xs font-black text-primary text-right ml-4">{selectedMember.university}</span>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1 px-1">Correo Electrónico</label>
-                                            <input
-                                                type="email"
-                                                value={manualAssignData.email}
-                                                onChange={(e) => setManualAssignData({ ...manualAssignData, email: e.target.value })}
-                                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-sm focus:border-secondary transition-all outline-none font-bold"
-                                                placeholder="juan@universidad.edu"
-                                                required
-                                            />
-                                        </div>
-                                    </>
-                                ) : (
-                                    <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 px-1">Seleccionar Usuario</label>
-                                        <select
-                                            value={manualAssignData.userId}
-                                            onChange={(e) => setManualAssignData({ ...manualAssignData, userId: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-sm focus:border-secondary outline-none appearance-none cursor-pointer font-bold text-primary"
-                                            required
-                                        >
-                                            <option value="">Selecciona un usuario registrado...</option>
-                                            {members.map(m => (
-                                                <option key={m.id} value={m.id}>{m.name} ({m.email})</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                )}
-
-                                <div className="space-y-4">
-                                    <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200">
-                                        <button
-                                            type="button"
-                                            onClick={() => setManualAssignData({ ...manualAssignData, productType: 'membership' })}
-                                            className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${manualAssignData.productType === 'membership' ? 'bg-white text-primary shadow-sm border border-slate-100' : 'text-slate-400'}`}
-                                        >
-                                            Membresía
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setManualAssignData({ ...manualAssignData, productType: 'event' })}
-                                            className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${manualAssignData.productType === 'event' ? 'bg-white text-secondary shadow-sm border border-slate-100' : 'text-slate-400'}`}
-                                        >
-                                            Evento
-                                        </button>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 px-1">
-                                                {manualAssignData.productType === 'membership' ? 'Nivel' : 'Producto/Evento'}
-                                            </label>
-                                            <select
-                                                value={manualAssignData.level}
-                                                onChange={(e) => setManualAssignData({ ...manualAssignData, level: e.target.value })}
-                                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-sm focus:border-secondary outline-none appearance-none cursor-pointer font-bold text-primary"
+                                    <div className="space-y-8">
+                                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-[18px]">engineering</span>
+                                            Acciones de Gestión
+                                        </h4>
+                                        <div className="space-y-3">
+                                            <button
+                                                onClick={() => {
+                                                    setManualAssignData({
+                                                        ...manualAssignData,
+                                                        userId: selectedMember.id.toString(),
+                                                        level: selectedMember.membership || 'personal',
+                                                        expiryDate: selectedMember.expiry,
+                                                        isNewUser: false
+                                                    });
+                                                    setShowMemberDetailModal(false);
+                                                    setShowManualAssignModal(true);
+                                                }}
+                                                className="w-full flex items-center gap-3 px-5 py-4 bg-slate-100 hover:bg-secondary/10 hover:text-secondary rounded-2xl transition-all group"
                                             >
-                                                {manualAssignData.productType === 'membership' ? (
-                                                    <>
-                                                        <option value="personal">Personal</option>
-                                                        <option value="institutional">Institucional</option>
-                                                    </>
-                                                ) : (
-                                                    products
-                                                        .filter(p => p.sku?.startsWith('EVT-') || p.name?.toLowerCase().includes('evento') || p.name?.toLowerCase().includes('congreso'))
-                                                        .map(p => (
-                                                            <option key={p.id} value={p.name}>{p.name}</option>
-                                                        ))
-                                                )}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 px-1">Vence el:</label>
-                                            <input
-                                                type="date"
-                                                value={manualAssignData.expiryDate}
-                                                onChange={(e) => setManualAssignData({ ...manualAssignData, expiryDate: e.target.value })}
-                                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-sm focus:border-secondary outline-none font-bold text-primary"
-                                                required
-                                            />
+                                                <span className="material-symbols-outlined text-xl">update</span>
+                                                <span className="text-[10px] font-black uppercase tracking-widest">Renovar / Cambiar Nivel</span>
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteMember(selectedMember.id)}
+                                                className="w-full flex items-center gap-3 px-5 py-4 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-2xl transition-all group"
+                                            >
+                                                <span className="material-symbols-outlined text-xl">person_remove</span>
+                                                <span className="text-[10px] font-black uppercase tracking-widest">Eliminar Cuenta Permanentemente</span>
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
 
-                                <button
-                                    type="submit"
-                                    disabled={isAssigning}
-                                    className="w-full bg-primary text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-secondary hover:text-primary transition-all shadow-xl shadow-primary/20 flex items-center justify-center gap-3 disabled:opacity-50"
-                                >
-                                    {isAssigning ? (
-                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                    ) : (
-                                        <span className="material-symbols-outlined">how_to_reg</span>
-                                    )}
-                                    {isAssigning ? 'Procesando...' : (manualAssignData.isNewUser ? 'Crear y Vincular' : 'Confirmar Asignación')}
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-                )}
-
-                {/* Modal: Detalle / Editor de Miembro */}
-                {showMemberDetailModal && selectedMember && (
-                    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
-                        <div className="absolute inset-0 bg-primary/80 backdrop-blur-md" onClick={() => setShowMemberDetailModal(false)}></div>
-                        <div className="relative bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden border border-white/20">
-                            <div className="p-10 border-b border-slate-100 flex justify-between items-start bg-slate-50/50">
-                                <div className="flex gap-6 items-center">
-                                    <div className="w-20 h-20 rounded-[2rem] border-4 border-white shadow-xl overflow-hidden">
-                                        <img src={selectedMember.avatar} className="w-full h-full object-cover" />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-2xl font-black text-primary tracking-tight">{selectedMember.name}</h3>
-                                        <p className="text-sm text-slate-400 font-bold">{selectedMember.email}</p>
-                                        <div className="flex gap-2 mt-2">
-                                            <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1 bg-primary/5 text-primary rounded-full border border-primary/10">ID: #{selectedMember.id}</span>
-                                            <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1 bg-green-50 text-green-500 rounded-full border border-green-100">{selectedMember.status}</span>
-                                        </div>
-                                    </div>
+                                <div className="px-10 py-6 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
+                                    <p className="text-[10px] text-slate-400 font-bold italic">Última actividad: {selectedMember.signup_date || 'No registrada'}</p>
+                                    <button className="text-[10px] font-black uppercase tracking-widest text-primary hover:text-secondary flex items-center gap-1 transition-colors">
+                                        Ver Pedidos en WooCommerce
+                                        <span className="material-symbols-outlined text-sm">open_in_new</span>
+                                    </button>
                                 </div>
-                                <button onClick={() => setShowMemberDetailModal(false)} className="w-10 h-10 rounded-full hover:bg-slate-200 transition-colors flex items-center justify-center text-slate-400">
-                                    <span className="material-symbols-outlined">close</span>
-                                </button>
-                            </div>
-
-                            <div className="p-10 grid grid-cols-1 md:grid-cols-2 gap-10">
-                                <div className="space-y-8">
-                                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-[18px]">verified_user</span>
-                                        Membresía Actual
-                                    </h4>
-                                    <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200">
-                                        <div className="flex justify-between items-center mb-4">
-                                            <span className="text-xs font-bold text-slate-500">Tipo:</span>
-                                            <span className="text-sm font-black text-primary capitalize">{selectedMember.membership_type}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center mb-4">
-                                            <span className="text-xs font-bold text-slate-500">Expira el:</span>
-                                            <span className="text-sm font-black text-secondary">{selectedMember.expiry}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-xs font-bold text-slate-500">Institución:</span>
-                                            <span className="text-xs font-black text-primary text-right ml-4">{selectedMember.university}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-8">
-                                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-[18px]">engineering</span>
-                                        Acciones de Gestión
-                                    </h4>
-                                    <div className="space-y-3">
-                                        <button
-                                            onClick={() => {
-                                                setManualAssignData({
-                                                    ...manualAssignData,
-                                                    userId: selectedMember.id.toString(),
-                                                    level: selectedMember.membership || 'personal',
-                                                    expiryDate: selectedMember.expiry,
-                                                    isNewUser: false
-                                                });
-                                                setShowMemberDetailModal(false);
-                                                setShowManualAssignModal(true);
-                                            }}
-                                            className="w-full flex items-center gap-3 px-5 py-4 bg-slate-100 hover:bg-secondary/10 hover:text-secondary rounded-2xl transition-all group"
-                                        >
-                                            <span className="material-symbols-outlined text-xl">update</span>
-                                            <span className="text-[10px] font-black uppercase tracking-widest">Renovar / Cambiar Nivel</span>
-                                        </button>
-                                        <button
-                                            onClick={() => handleDeleteMember(selectedMember.id)}
-                                            className="w-full flex items-center gap-3 px-5 py-4 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-2xl transition-all group"
-                                        >
-                                            <span className="material-symbols-outlined text-xl">person_remove</span>
-                                            <span className="text-[10px] font-black uppercase tracking-widest">Eliminar Cuenta Permanentemente</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="px-10 py-6 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
-                                <p className="text-[10px] text-slate-400 font-bold italic">Última actividad: {selectedMember.signup_date || 'No registrada'}</p>
-                                <button className="text-[10px] font-black uppercase tracking-widest text-primary hover:text-secondary flex items-center gap-1 transition-colors">
-                                    Ver Pedidos en WooCommerce
-                                    <span className="material-symbols-outlined text-sm">open_in_new</span>
-                                </button>
                             </div>
                         </div>
-                    </div>
-                )}
+                    )
+                }
 
                 {/* Modal: Biblioteca de Medios */}
                 {
