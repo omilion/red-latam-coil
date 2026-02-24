@@ -1565,13 +1565,44 @@ const AdminPortal: React.FC = () => {
                                             {(activeTab === 'eventos' || editingItem.sku?.startsWith('EVT-')) && (
                                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                                                     <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
-                                                        <label className="block text-[11px] uppercase font-black tracking-widest text-slate-500 mb-4">Fecha</label>
-                                                        <input
-                                                            type="date"
-                                                            value={editingItem.rlc_event_date || ''}
-                                                            onChange={(e) => setEditingItem({ ...editingItem, rlc_event_date: e.target.value })}
-                                                            className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-primary font-bold focus:border-secondary outline-none shadow-sm"
-                                                        />
+                                                        <div className="flex items-center justify-between mb-4">
+                                                            <label className="block text-[11px] uppercase font-black tracking-widest text-slate-500">Fecha</label>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    if (editingItem.rlc_event_date_end) {
+                                                                        setEditingItem({ ...editingItem, rlc_event_date_end: '' });
+                                                                    } else {
+                                                                        setEditingItem({ ...editingItem, rlc_event_date_end: editingItem.rlc_event_date || '' });
+                                                                    }
+                                                                }}
+                                                                className={`text-[9px] uppercase font-black tracking-widest px-3 py-1 rounded-full transition-all ${editingItem.rlc_event_date_end ? 'bg-secondary text-primary' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
+                                                            >
+                                                                {editingItem.rlc_event_date_end ? '✓ Rango' : '+ Rango'}
+                                                            </button>
+                                                        </div>
+                                                        <div className={`grid gap-3 ${editingItem.rlc_event_date_end ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                                                            <div>
+                                                                {editingItem.rlc_event_date_end && <span className="text-[9px] uppercase font-black tracking-widest text-slate-400 mb-1 block">Inicio</span>}
+                                                                <input
+                                                                    type="date"
+                                                                    value={editingItem.rlc_event_date || ''}
+                                                                    onChange={(e) => setEditingItem({ ...editingItem, rlc_event_date: e.target.value })}
+                                                                    className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-primary font-bold focus:border-secondary outline-none shadow-sm text-sm"
+                                                                />
+                                                            </div>
+                                                            {editingItem.rlc_event_date_end && (
+                                                                <div>
+                                                                    <span className="text-[9px] uppercase font-black tracking-widest text-slate-400 mb-1 block">Fin</span>
+                                                                    <input
+                                                                        type="date"
+                                                                        value={editingItem.rlc_event_date_end || ''}
+                                                                        onChange={(e) => setEditingItem({ ...editingItem, rlc_event_date_end: e.target.value })}
+                                                                        className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-primary font-bold focus:border-secondary outline-none shadow-sm text-sm"
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                     <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
                                                         <label className="block text-[11px] uppercase font-black tracking-widest text-slate-500 mb-4">Hora (UTC)</label>
