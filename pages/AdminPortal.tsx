@@ -576,52 +576,7 @@ const AdminPortal: React.FC = () => {
                                 className="bg-white border border-slate-200 rounded-full pl-12 pr-6 py-2.5 text-sm focus:ring-4 focus:ring-secondary/5 focus:border-secondary outline-none w-64 transition-all shadow-sm"
                             />
                         </div>
-                        <button
-                            onClick={async () => {
-                                if (activeTab === 'web') {
-                                    const defaults = {
-                                        hero: { title: 'Conectando aulas, transformando el mundo.', subtitle: 'Únete a la red líder en América Latina para el Aprendizaje Internacional Colaborativo en Línea (COIL).', cta_text: 'Únete a la Red', bg_image: '' },
-                                        stats: [{ label: 'UNIVERSIDADES', value: '150+' }, { label: 'ESTUDIANTES', value: '5,000+' }, { label: 'PAÍSES', value: '12+' }, { label: 'PROYECTOS COIL', value: '300+' }],
-                                        team: [
-                                            { name: 'Coord. General', role: 'Consejo Directivo', inst: 'Universidad Veracruzana', icon: 'person_filled', visible: true },
-                                            { name: 'Rep. México', role: 'Consejo Regional', inst: 'Inst. Tecnológico de Monterrey', icon: 'person', visible: true }
-                                        ]
-                                    };
-                                    setWebSettings(defaults);
-                                    await wpService.updateWebSettings(defaults);
-                                    alert('Configuración de ejemplo sembrada.');
-                                    return;
-                                }
 
-                                if (confirm('¿Deseas poblar la base de datos con los contenidos de ejemplo solicitados? Este proceso añadirá videos, materiales y el congreso automáticamente.')) {
-                                    try {
-                                        const token = localStorage.getItem('rlc_token');
-                                        const response = await fetch(`${import.meta.env.VITE_WP_URL}/wp-json/rlc/v1/seed`, {
-                                            method: 'POST',
-                                            headers: {
-                                                'Authorization': `Bearer ${token}`
-                                            }
-                                        });
-                                        const data = await response.json();
-
-                                        if (response.ok) {
-                                            const details = data.details || {};
-                                            alert(`¡Éxito!\n- Recursos creados: ${details.resources_created || 0}\n- Eventos creados: ${details.events_created || 0}\n- ID Usuario Server: ${details.user_id || 'N/A'}`);
-                                            window.location.reload();
-                                        } else {
-                                            alert(`Error del Servidor: ${data.error || 'Desconocido'}\nDetalle: ${JSON.stringify(data.wp_error || data.message || data)}`);
-                                        }
-                                    } catch (e: any) {
-                                        console.error('Seed Error:', e);
-                                        alert(`Error de conexión: ${e.message || 'Desconocido'}. Asegúrate de que el plugin esté activo y los enlaces permanentes guardados.`);
-                                    }
-                                }
-                            }}
-                            className="bg-secondary text-primary px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-primary hover:text-white transition-all shadow-lg shadow-secondary/10"
-                        >
-                            <span className="material-symbols-outlined text-sm">{activeTab === 'web' ? 'language' : 'database'}</span>
-                            {activeTab === 'web' ? 'Sembrar Ejemplo Web' : t('admin.header.seed')}
-                        </button>
                         <button className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-primary transition-all shadow-sm">
                             <span className="material-symbols-outlined">notifications</span>
                         </button>
