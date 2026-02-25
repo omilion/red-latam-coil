@@ -85,7 +85,7 @@ const Home: React.FC = () => {
         <div className="absolute inset-0 z-0">
           <img
             src={heroBgImage}
-            className="w-full h-full object-cover brightness-[0.4]"
+            className="ken-burns-bg w-full h-full object-cover brightness-[0.4]"
             alt="Hero Background"
           />
         </div>

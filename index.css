@@ -1,35 +1,70 @@
-/* Custom CSS Animaciones Premium */ 
-.pulse-glow-btn { 
-    position: relative; 
-} 
-.pulse-glow-btn::before { 
-    content: ''; 
-    position: absolute; 
-    inset: -4px; 
-    border-radius: inherit; 
-    background: linear-gradient(90deg, #00B8D4, #FFC107, #00B8D4); 
-    background-size: 200% auto; 
-    animation: shine-pulse 3s linear infinite; 
-    z-index: -1; 
-    filter: blur(8px); 
-    opacity: 0; 
-    transition: opacity 0.3s ease; 
-} 
-.pulse-glow-btn:hover::before { 
-    opacity: 0.6; 
-} 
-@keyframes shine-pulse { 
-    to { background-position: 200% center; } 
-} 
-.animate-on-scroll { 
-    opacity: 0; 
-    transform: translateY(30px); 
-    transition: all 0.8s cubic-bezier(0.22, 1, 0.36, 1); 
-} 
-.animate-on-scroll.visible { 
-    opacity: 1; 
-    transform: translateY(0); 
-} 
-.stagger-1 { transition-delay: 0.1s; } 
-.stagger-2 { transition-delay: 0.2s; } 
-.stagger-3 { transition-delay: 0.3s; }
+/* Custom CSS Animaciones Premium */
+.pulse-glow-btn {
+    position: relative;
+}
+
+.pulse-glow-btn::before {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #FFC107, #FFFF00, #FFC107);
+    background-size: 200% auto;
+    animation: shine-pulse 3s linear infinite;
+    z-index: -1;
+    filter: blur(8px);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.pulse-glow-btn:hover::before {
+    opacity: 0.8;
+}
+
+@keyframes shine-pulse {
+    to {
+        background-position: 200% center;
+    }
+}
+
+.animate-on-scroll {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: all 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.animate-on-scroll.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.stagger-1 {
+    transition-delay: 0.3s;
+}
+
+.stagger-2 {
+    transition-delay: 0.5s;
+}
+
+.stagger-3 {
+    transition-delay: 0.7s;
+}
+
+.stagger-4 {
+    transition-delay: 0.9s;
+}
+
+/* Efecto Ken Burns Lento para Hero */
+@keyframes ken-burns {
+    0% {
+        transform: scale(1);
+    }
+
+    100% {
+        transform: scale(1.15);
+    }
+}
+
+.ken-burns-bg {
+    animation: ken-burns 30s ease-out infinite alternate;
+}
