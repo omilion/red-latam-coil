@@ -20,18 +20,6 @@ const Nosotros: React.FC = () => {
   const [showFounders, setShowFounders] = useState(false);
 
   useEffect(() => {
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('visible');
-          observer.unobserve(entry.target);
-        }
-      });
-    }, { threshold: 0.1 });
-
-    const elements = document.querySelectorAll('.animate-on-scroll');
-    elements.forEach(el => observer.observe(el));
-
     const loadData = async () => {
       try {
         const settings = await wpService.getWebSettings();
@@ -43,9 +31,30 @@ const Nosotros: React.FC = () => {
       }
     };
     loadData();
-
-    return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (loading) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1 });
+
+    const timeout = setTimeout(() => {
+      const elements = document.querySelectorAll('.animate-on-scroll');
+      elements.forEach(el => observer.observe(el));
+    }, 100);
+
+    return () => {
+      clearTimeout(timeout);
+      observer.disconnect();
+    };
+  }, [loading]);
 
   const teamMembers = webSettings?.team?.filter((m: any) => m.visible) || [
     { name: 'Coord. General', role: 'Consejo Directivo', inst: 'Universidad Veracruzana', icon: 'person_filled' },
