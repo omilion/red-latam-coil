@@ -589,7 +589,7 @@ class RLC_Membership_Core
 
     public function register_product_meta_fields()
     {
-        $meta = ['rlc_event_date', 'rlc_event_time', 'rlc_event_location', 'rlc_event_is_featured', 'rlc_event_pretitle', 'rlc_event_subtitle', 'rlc_event_program', 'rlc_event_objectives', 'rlc_event_program_desc', 'rlc_membership_duration'];
+        $meta = ['rlc_event_date', 'rlc_event_date_end', 'rlc_event_time', 'rlc_event_location', 'rlc_event_is_featured', 'rlc_event_pretitle', 'rlc_event_subtitle', 'rlc_event_program', 'rlc_event_objectives', 'rlc_event_program_desc', 'rlc_membership_duration'];
         foreach ($meta as $f)
             register_meta('post', $f, ['object_subtype' => 'product', 'type' => 'string', 'single' => true, 'show_in_rest' => true]);
         add_filter('rest_prepare_product', [$this, 'expose_product_event_meta'], 10, 3);
@@ -597,7 +597,7 @@ class RLC_Membership_Core
 
     public function expose_product_event_meta($response, $post, $request)
     {
-        $fields = ['rlc_event_date', 'rlc_event_time', 'rlc_event_location', 'rlc_event_pretitle', 'rlc_event_subtitle', 'rlc_event_program', 'rlc_event_objectives', 'rlc_event_program_desc', 'rlc_membership_duration'];
+        $fields = ['rlc_event_date', 'rlc_event_date_end', 'rlc_event_time', 'rlc_event_location', 'rlc_event_pretitle', 'rlc_event_subtitle', 'rlc_event_program', 'rlc_event_objectives', 'rlc_event_program_desc', 'rlc_membership_duration'];
         foreach ($fields as $f)
             $response->data[$f] = get_post_meta($post->ID, $f, true);
         $response->data['rlc_event_is_featured'] = (bool) get_post_meta($post->ID, 'rlc_event_is_featured', true);
