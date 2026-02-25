@@ -359,6 +359,7 @@ const AdminPortal: React.FC = () => {
                 if (activeTab === 'eventos') {
                     productData.meta_data = [
                         { key: 'rlc_event_date', value: editingItem.rlc_event_date || '' },
+                        { key: 'rlc_event_date_end', value: editingItem.rlc_event_date_end || '' },
                         { key: 'rlc_event_time', value: editingItem.rlc_event_time || '' },
                         { key: 'rlc_event_location', value: editingItem.rlc_event_location || '' },
                         { key: 'rlc_event_is_featured', value: editingItem.rlc_event_is_featured ? 'yes' : 'no' },
