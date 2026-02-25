@@ -30,6 +30,29 @@ const Eventos: React.FC = () => {
     loadEvents();
   }, []);
 
+  useEffect(() => {
+    if (loading) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1 });
+
+    const timeout = setTimeout(() => {
+      const elements = document.querySelectorAll('.animate-on-scroll, .flash-border');
+      elements.forEach(el => observer.observe(el));
+    }, 100);
+
+    return () => {
+      clearTimeout(timeout);
+      observer.disconnect();
+    };
+  }, [loading]);
+
   const featuredEvent = events.find(e => e.rlc_event_is_featured) || events[0];
   const otherEvents = events.filter(e => e.id !== featuredEvent?.id);
 
@@ -59,7 +82,7 @@ const Eventos: React.FC = () => {
       <main className="max-w-7xl mx-auto px-6 -mt-10 relative z-20 pb-32">
         {/* Featured Event Teaser Section */}
         {featuredEvent && (
-          <div className="bg-white rounded-[3rem] shadow-2xl shadow-primary/5 border border-slate-100 overflow-hidden mb-20 animate-fade-in">
+          <div className="bg-white rounded-[3rem] shadow-2xl shadow-primary/5 border border-slate-100 overflow-hidden mb-20 animate-on-scroll flash-border stagger-1">
             <div className="grid lg:grid-cols-2">
               {/* Event Visual Side */}
               <div className="relative h-[400px] lg:h-auto">
@@ -146,31 +169,33 @@ const Eventos: React.FC = () => {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {otherEvents.length > 0 ? otherEvents.map((event, i) => (
-              <div key={i} className="bg-white rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all group overflow-hidden flex flex-col">
-                <div className="h-48 overflow-hidden relative">
-                  <img
-                    src={event.featured_media_url || event.images?.[0]?.src || "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=400"}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                    alt=""
-                  />
-                  <div className="absolute top-4 left-4">
-                    <span className="bg-white/90 backdrop-blur px-3 py-1 rounded-lg text-[9px] font-black text-primary uppercase tracking-widest">
-                      {formatEventDateRange(event.rlc_event_date, event.rlc_event_date_end, 'es-ES')}
-                    </span>
+              <div key={i} className={`animate-on-scroll stagger-${i + 1}`}>
+                <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all group overflow-hidden flex flex-col h-full hover:-translate-y-2 duration-300">
+                  <div className="h-48 overflow-hidden relative">
+                    <img
+                      src={event.featured_media_url || event.images?.[0]?.src || "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=400"}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                      alt=""
+                    />
+                    <div className="absolute top-4 left-4">
+                      <span className="bg-white/90 backdrop-blur px-3 py-1 rounded-lg text-[9px] font-black text-primary uppercase tracking-widest">
+                        {formatEventDateRange(event.rlc_event_date, event.rlc_event_date_end, 'es-ES')}
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <div className="p-8 flex-1 flex flex-col">
-                  <h3 className="text-xl font-bold text-primary mb-3 leading-tight group-hover:text-secondary transition-colors">
-                    <TranslatableText>{event.name}</TranslatableText>
-                  </h3>
-                  <div className="text-slate-400 text-xs line-clamp-2 mb-6">
-                    <TranslatableText isHtml>{event.description}</TranslatableText>
-                  </div>
-                  <div className="mt-auto pt-6 border-t border-slate-50 flex items-center justify-between">
-                    <span className="text-secondary font-black text-sm">${event.regular_price}</span>
-                    <Link to={`/eventos/${event.id}`} className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2 hover:text-secondary transition-colors">
-                      {t('events.other.details')} <span className="material-symbols-outlined text-sm">arrow_forward</span>
-                    </Link>
+                  <div className="p-8 flex-1 flex flex-col">
+                    <h3 className="text-xl font-bold text-primary mb-3 leading-tight group-hover:text-secondary transition-colors">
+                      <TranslatableText>{event.name}</TranslatableText>
+                    </h3>
+                    <div className="text-slate-400 text-xs line-clamp-2 mb-6">
+                      <TranslatableText isHtml>{event.description}</TranslatableText>
+                    </div>
+                    <div className="mt-auto pt-6 border-t border-slate-50 flex items-center justify-between">
+                      <span className="text-secondary font-black text-sm">${event.regular_price}</span>
+                      <Link to={`/eventos/${event.id}`} className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2 hover:text-secondary transition-colors">
+                        {t('events.other.details')} <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -194,13 +219,15 @@ const Eventos: React.FC = () => {
               { title: t('events.why.cert'), icon: 'workspace_premium', desc: t('events.why.cert.desc') },
               { title: t('events.why.res'), icon: 'library_books', desc: t('events.why.res.desc') }
             ].map((s, i) => (
-              <div key={i} className="bg-white p-6 rounded-3xl border border-slate-100 flex gap-4 items-center shadow-sm">
-                <div className="w-12 h-12 rounded-2xl bg-secondary/10 flex items-center justify-center text-secondary">
-                  <span className="material-symbols-outlined">{s.icon}</span>
-                </div>
-                <div>
-                  <h4 className="font-bold text-primary leading-tight">{s.title}</h4>
-                  <p className="text-slate-500 text-xs mt-1 leading-snug">{s.desc}</p>
+              <div key={i} className={`animate-on-scroll stagger-${i + 1}`}>
+                <div className="bg-white p-6 rounded-3xl border border-slate-100 flex gap-4 items-center shadow-sm h-full hover:shadow-xl hover:-translate-y-1 transition-all">
+                  <div className="w-12 h-12 rounded-2xl bg-secondary/10 flex items-center justify-center text-secondary">
+                    <span className="material-symbols-outlined">{s.icon}</span>
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-primary leading-tight">{s.title}</h4>
+                    <p className="text-slate-500 text-xs mt-1 leading-snug">{s.desc}</p>
+                  </div>
                 </div>
               </div>
             ))}
