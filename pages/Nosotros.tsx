@@ -40,6 +40,14 @@ const Nosotros: React.FC = () => {
     { name: 'Rep. Cono Sur', role: 'Consejo Regional', inst: 'Univ. de Buenos Aires', icon: 'person' }
   ];
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white min-h-screen">
       {/* 1. SECCIÓN HERO (Cabecera) */}

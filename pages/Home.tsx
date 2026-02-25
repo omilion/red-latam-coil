@@ -69,6 +69,14 @@ const Home: React.FC = () => {
     { label: t('stats.projects', 'Proyectos COIL'), value: '+300' },
   ];
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   return (
     <div>
       {/* Hero Section */}
