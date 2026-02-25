@@ -51,7 +51,7 @@ const Footer: React.FC = () => {
               <img
                 src={logoOscuro}
                 alt="Red LatAm COIL Logo"
-                className="h-32 w-auto"
+                className="h-32 w-auto hover:brightness-110 hover:scale-[1.02] transition-all origin-left cursor-pointer"
               />
             </div>
             <p className="text-slate-400 text-sm leading-relaxed max-w-sm">
@@ -95,12 +95,12 @@ const Footer: React.FC = () => {
                 <button
                   onClick={handleSubscribe}
                   disabled={loading}
-                  className="bg-secondary px-4 py-2 rounded-r-lg hover:bg-cyan-400 transition disabled:opacity-50"
+                  className="pulse-glow-btn bg-accent px-5 py-2 rounded-r-lg transition-all disabled:opacity-50 group hover:scale-105 active:scale-95"
                 >
                   {loading ? (
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
                   ) : (
-                    <span className="material-symbols-outlined text-white">send</span>
+                    <span className="material-symbols-outlined text-primary group-hover:translate-x-1 transition-transform">send</span>
                   )}
                 </button>
               </div>
@@ -122,10 +122,10 @@ const Footer: React.FC = () => {
           <p className="mb-4 md:mb-0">{t('footer.copy')}</p>
           <div className="flex flex-wrap justify-center gap-6 items-center">
             <div className="flex gap-4 border-r border-white/10 pr-6 mr-2">
-              <a href="https://www.instagram.com/latam_coil/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-secondary transition-colors">
+              <a href="https://www.instagram.com/latam_coil/" target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-accent hover:scale-110 transition-all inline-block">
                 <i className="fa-brands fa-instagram text-lg"></i>
               </a>
-              <a href="https://linkedin.com/in/red-latinoamericana-coil?originalSubdomain=mx" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-secondary transition-colors">
+              <a href="https://linkedin.com/in/red-latinoamericana-coil?originalSubdomain=mx" target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-accent hover:scale-110 transition-all inline-block">
                 <i className="fa-brands fa-linkedin text-lg"></i>
               </a>
             </div>
