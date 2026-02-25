@@ -718,13 +718,13 @@ const AdminPortal: React.FC = () => {
                         </div>
 
                         {/* Tabla de Socios con Filtros */}
+                        <div className="mb-4 ml-4">
+                            <h3 className="text-2xl font-black text-primary tracking-tight">Socios con Membresía Activa</h3>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">TOTAL REGISTRADOS EN PLATAFORMA: {members.length}</p>
+                        </div>
                         <div className="bg-white border border-slate-200 rounded-[2.5rem] overflow-hidden shadow-sm mb-12">
-                            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                                <div>
-                                    <h3 className="text-lg font-black text-primary tracking-tight">Socios con Membresía Activa</h3>
-                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Total registrados en plataforma: {members.length}</p>
-                                </div>
-                                <div className="flex items-center gap-4">
+                            <div className="p-8 border-b border-slate-100 overflow-x-auto bg-slate-50/50">
+                                <div className="flex items-center gap-4 w-max min-w-full">
                                     {/* Buscador de Socios */}
                                     <div className="relative group/search bg-white border border-slate-200 rounded-2xl pl-10 pr-4 py-2 shadow-inner">
                                         <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within/search:text-secondary transition-colors text-lg">search</span>
@@ -810,7 +810,10 @@ const AdminPortal: React.FC = () => {
                                                 }
                                                 // Filtro por Tipo
                                                 if (memberTypeFilter !== 'all') {
-                                                    if (m.membership_type !== memberTypeFilter) return false;
+                                                    const typeStr = (m.membership_type || 'personal').toLowerCase();
+                                                    const isInstitutional = typeStr.includes('institutional') || typeStr.includes('institucional');
+                                                    if (memberTypeFilter === 'institutional' && !isInstitutional) return false;
+                                                    if (memberTypeFilter === 'personal' && isInstitutional) return false;
                                                 }
                                                 // Buscador
                                                 if (memberSearch) {
