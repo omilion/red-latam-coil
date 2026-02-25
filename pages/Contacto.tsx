@@ -28,25 +28,27 @@ const Contacto: React.FC = () => {
       <div className="absolute bottom-0 left-0 -ml-40 -mb-40 w-96 h-96 bg-accent/10 rounded-full blur-3xl"></div>
 
       <div className="max-w-7xl mx-auto relative z-10">
-        <div className="max-w-3xl mb-16 text-center lg:text-left animate-on-scroll stagger-1">
-          <h1 className="text-4xl md:text-6xl font-display font-extrabold text-primary mb-6">{t('contact.title.part1')}<span className="text-secondary">{t('contact.title.part2')}</span></h1>
-          <p className="text-lg text-slate-500 font-light leading-relaxed">{t('contact.desc')}</p>
-        </div>
-
         <div className="flex flex-col lg:grid lg:grid-cols-2 gap-20 items-start">
-          <div className="space-y-12 order-2 lg:order-1">
+          <div className="space-y-12 order-2 lg:order-1 pt-4">
+            <div className="max-w-3xl animate-on-scroll stagger-1">
+              <h1 className="text-4xl md:text-6xl font-display font-extrabold text-primary mb-6">{t('contact.title.part1')}<span className="text-secondary">{t('contact.title.part2')}</span></h1>
+              <p className="text-lg text-slate-500 font-light leading-relaxed">{t('contact.desc')}</p>
+            </div>
+
             <div className="grid gap-6">
               {[
                 { title: t('contact.support.title'), info: 'info@redlatamcoil.com', icon: 'mail', color: 'bg-secondary/10 text-secondary' },
                 { title: 'Oficina Central (México)', info: 'Operando desde nuestra sede en México para toda Latinoamérica y el mundo.', icon: 'location_on', color: 'bg-primary/5 text-primary' }
               ].map((item, i) => (
-                <div key={i} className={`bg-white p-6 rounded-3xl border border-slate-100 flex items-center gap-6 shadow-xl shadow-slate-200/50 hover:-translate-y-2 transition-transform duration-300 animate-on-scroll stagger-${i + 2}`}>
-                  <div className={`w-16 h-16 ${item.color} rounded-2xl flex items-center justify-center shadow-inner`}>
-                    <span className="material-symbols-outlined text-3xl">{item.icon}</span>
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-primary text-xl mb-1">{item.title}</h4>
-                    <p className="text-slate-500 font-medium">{item.info}</p>
+                <div key={i} className={`animate-on-scroll stagger-${i + 2}`}>
+                  <div className="bg-white p-6 rounded-3xl border border-slate-100 flex items-center gap-6 shadow-xl shadow-slate-200/50 hover:-translate-y-2 transition-transform duration-300">
+                    <div className={`w-16 h-16 ${item.color} rounded-2xl flex items-center justify-center shadow-inner`}>
+                      <span className="material-symbols-outlined text-3xl">{item.icon}</span>
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-primary text-xl mb-1">{item.title}</h4>
+                      <p className="text-slate-500 font-medium">{item.info}</p>
+                    </div>
                   </div>
                 </div>
               ))}

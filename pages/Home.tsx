@@ -127,10 +127,12 @@ const Home: React.FC = () => {
       <section className="max-w-7xl mx-auto px-6 -mt-12 relative z-20 mb-24">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
           {stats.map((stat: any, i: number) => (
-            <div key={i} className={`animate-on-scroll stagger-${i + 1} bg-white p-8 rounded-2xl shadow-xl text-center border border-slate-100 hover:translate-y-[-4px] transition-transform`}>
-              <div className={`text-4xl font-display font-extrabold mb-2 ${i % 2 === 0 ? 'text-secondary' : 'text-accent'}`}>{stat.value}</div>
-              <div className="text-slate-500 font-bold uppercase tracking-widest text-xs">
-                <TranslatableText>{stat.label}</TranslatableText>
+            <div key={i} className={`animate-on-scroll stagger-${i + 1}`}>
+              <div className="bg-white p-8 rounded-2xl shadow-xl text-center border border-slate-100 hover:-translate-y-2 transition-transform duration-300 h-full">
+                <div className={`text-4xl font-display font-extrabold mb-2 ${i % 2 === 0 ? 'text-secondary' : 'text-accent'}`}>{stat.value}</div>
+                <div className="text-slate-500 font-bold uppercase tracking-widest text-xs">
+                  <TranslatableText>{stat.label}</TranslatableText>
+                </div>
               </div>
             </div>
           ))}
@@ -325,16 +327,18 @@ const Home: React.FC = () => {
               { name: 'Ricardo Castro', org: 'Univ. de los Andes, Colombia', text: '"Encontrar socios estratégicos era nuestro mayor reto. El buscador de la Red LatAm simplificó todo el proceso de emparejamiento."', initial: 'RC', color: 'bg-secondary' },
               { name: 'Sofia González', org: 'USP, Brasil', text: '"COIL no es solo tecnología, es pedagogía centrada en la diversidad. La formación de la Red fue fundamental para nuestro éxito."', initial: 'SG', color: 'bg-accent text-primary' }
             ].map((testi, i) => (
-              <div key={i} className={`bg-white p-8 rounded-3xl shadow-sm border border-slate-100 relative transition-transform hover:-translate-y-2 hover:shadow-lg duration-300 animate-on-scroll stagger-${i + 1}`}>
-                <span className="material-symbols-outlined text-secondary/20 text-6xl absolute top-4 left-4">format_quote</span>
-                <p className="text-slate-600 mb-8 relative z-10 italic leading-relaxed">
-                  <TranslatableText>{testi.text}</TranslatableText>
-                </p>
-                <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 ${testi.color} rounded-full flex items-center justify-center text-white font-bold`}>{testi.initial}</div>
-                  <div>
-                    <h4 className="font-bold text-primary">{testi.name}</h4>
-                    <p className="text-xs text-slate-500">{testi.org}</p>
+              <div key={i} className={`animate-on-scroll stagger-${i + 1}`}>
+                <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 relative transition-transform hover:-translate-y-2 hover:shadow-lg duration-300 h-full">
+                  <span className="material-symbols-outlined text-secondary/20 text-6xl absolute top-4 left-4">format_quote</span>
+                  <p className="text-slate-600 mb-8 relative z-10 italic leading-relaxed">
+                    <TranslatableText>{testi.text}</TranslatableText>
+                  </p>
+                  <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 ${testi.color} rounded-full flex items-center justify-center text-white font-bold`}>{testi.initial}</div>
+                    <div>
+                      <h4 className="font-bold text-primary">{testi.name}</h4>
+                      <p className="text-xs text-slate-500">{testi.org}</p>
+                    </div>
                   </div>
                 </div>
               </div>
