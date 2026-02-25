@@ -20,11 +20,12 @@ const Home: React.FC = () => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
           entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
         }
       });
     }, { threshold: 0.15 });
 
-    const revealElements = document.querySelectorAll('.reveal-container');
+    const revealElements = document.querySelectorAll('.reveal-container, .animate-on-scroll');
     revealElements.forEach(el => observer.observe(el));
 
     return () => {
@@ -110,7 +111,7 @@ const Home: React.FC = () => {
             <TranslatableText>{heroSubtitle}</TranslatableText>
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/membresias" className="bg-accent text-primary px-8 py-4 rounded-xl font-bold text-lg hover:scale-105 transition transform shadow-xl">
+            <Link to="/membresias" className="pulse-glow-btn bg-accent text-primary px-8 py-4 rounded-xl font-bold text-lg hover:scale-105 active:scale-95 transition transform shadow-xl">
               {t('hero.cta')}
             </Link>
             <Link to="/recursos" className="bg-transparent border-2 border-white text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-white hover:text-primary transition transform shadow-xl flex items-center justify-center gap-2">
@@ -126,7 +127,7 @@ const Home: React.FC = () => {
       <section className="max-w-7xl mx-auto px-6 -mt-12 relative z-20 mb-24">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
           {stats.map((stat: any, i: number) => (
-            <div key={i} className="bg-white p-8 rounded-2xl shadow-xl text-center border border-slate-100 hover:translate-y-[-4px] transition-transform">
+            <div key={i} className={`animate-on-scroll stagger-${i + 1} bg-white p-8 rounded-2xl shadow-xl text-center border border-slate-100 hover:translate-y-[-4px] transition-transform`}>
               <div className={`text-4xl font-display font-extrabold mb-2 ${i % 2 === 0 ? 'text-secondary' : 'text-accent'}`}>{stat.value}</div>
               <div className="text-slate-500 font-bold uppercase tracking-widest text-xs">
                 <TranslatableText>{stat.label}</TranslatableText>
@@ -191,7 +192,7 @@ const Home: React.FC = () => {
             <div className="pt-6">
               <Link
                 to="/membresias"
-                className="inline-flex items-center gap-3 bg-primary text-white px-10 py-5 rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] hover:bg-secondary hover:text-white transition-all shadow-xl hover:scale-105 active:scale-95"
+                className="pulse-glow-btn inline-flex items-center gap-3 bg-primary text-white px-10 py-5 rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] hover:bg-secondary hover:text-white transition-all shadow-xl hover:scale-105 active:scale-95"
               >
                 {t('home.cta.join')}
                 <span className="material-symbols-outlined text-sm">rocket_launch</span>
@@ -253,7 +254,7 @@ const Home: React.FC = () => {
             </div>
 
             <div className="mt-12 lg:mt-0 relative z-10">
-              <Link to={`/eventos/${featuredEvent.id}`} className="group/btn bg-white text-primary px-12 py-6 rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] hover:bg-secondary hover:text-white transition-all shadow-2xl inline-flex items-center gap-4 hover:scale-105 active:scale-95">
+              <Link to={`/eventos/${featuredEvent.id}`} className="pulse-glow-btn group/btn bg-white text-primary px-12 py-6 rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] hover:bg-secondary hover:text-white transition-all shadow-2xl inline-flex items-center gap-4 hover:scale-105 active:scale-95">
                 {t('home.event.cta')}
                 <span className="material-symbols-outlined transition-transform group-hover/btn:translate-x-1">arrow_forward</span>
               </Link>
@@ -324,7 +325,7 @@ const Home: React.FC = () => {
               { name: 'Ricardo Castro', org: 'Univ. de los Andes, Colombia', text: '"Encontrar socios estratégicos era nuestro mayor reto. El buscador de la Red LatAm simplificó todo el proceso de emparejamiento."', initial: 'RC', color: 'bg-secondary' },
               { name: 'Sofia González', org: 'USP, Brasil', text: '"COIL no es solo tecnología, es pedagogía centrada en la diversidad. La formación de la Red fue fundamental para nuestro éxito."', initial: 'SG', color: 'bg-accent text-primary' }
             ].map((testi, i) => (
-              <div key={i} className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 relative">
+              <div key={i} className={`bg-white p-8 rounded-3xl shadow-sm border border-slate-100 relative transition-transform hover:-translate-y-2 hover:shadow-lg duration-300 animate-on-scroll stagger-${i + 1}`}>
                 <span className="material-symbols-outlined text-secondary/20 text-6xl absolute top-4 left-4">format_quote</span>
                 <p className="text-slate-600 mb-8 relative z-10 italic leading-relaxed">
                   <TranslatableText>{testi.text}</TranslatableText>
@@ -363,7 +364,7 @@ const Home: React.FC = () => {
             </p>
             <Link
               to="/membresias"
-              className="inline-flex bg-accent text-primary px-12 py-6 rounded-[2.5rem] font-black text-xs uppercase tracking-[0.2em] hover:scale-105 active:scale-95 transition-all shadow-2xl"
+              className="pulse-glow-btn inline-flex bg-accent text-primary px-12 py-6 rounded-[2.5rem] font-black text-xs uppercase tracking-[0.2em] hover:scale-105 active:scale-95 transition-all shadow-2xl"
             >
               {t('about.footer.cta')}
             </Link>
