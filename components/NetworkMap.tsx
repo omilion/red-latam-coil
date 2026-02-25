@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     ComposableMap,
     Geographies,
@@ -49,9 +49,29 @@ const partnerCountries = [
 
 const NetworkMap: React.FC = () => {
     const [tooltipContent, setTooltipContent] = useState<string | null>(null);
+    const [isVisible, setIsVisible] = useState(false);
+    const mapRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting) {
+                    setIsVisible(true);
+                    observer.disconnect();
+                }
+            },
+            { threshold: 0.3 }
+        );
+
+        if (mapRef.current) {
+            observer.observe(mapRef.current);
+        }
+
+        return () => observer.disconnect();
+    }, []);
 
     return (
-        <div className="relative w-full h-[600px] overflow-hidden bg-slate-50 rounded-[3rem] border border-slate-200 shadow-2xl shadow-primary/10 group/map cursor-grab active:cursor-grabbing">
+        <div ref={mapRef} className="relative w-full h-[600px] overflow-hidden bg-slate-50 rounded-[3rem] border border-slate-200 shadow-2xl shadow-primary/10 group/map cursor-grab active:cursor-grabbing">
             <style>
                 {`
                 @keyframes flow {
@@ -84,7 +104,7 @@ const NetworkMap: React.FC = () => {
                     projectionConfig={{
                         scale: 320,
                     }}
-                    className="map-svg"
+                    className={`map-svg transition-transform duration-[2000ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${isVisible ? 'scale-100 opacity-100' : 'scale-75 opacity-0'}`}
                     style={{
                         width: "100%",
                         height: "100%",
