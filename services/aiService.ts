@@ -130,21 +130,24 @@ export const aiService = {
      */
     async formatContent(text: string): Promise<string> {
         const prompt = `
-        Eres un experto en redactar beneficios concisos para membresías de una red académica (Red LatAm COIL).
-        Tu tarea es extraer los beneficios clave del texto y entregarlos en una LISTA HTML REFINADA.
+        Eres un experto en diseño editorial y maquetación web.
+        Tu tarea es mejorar el formato visual (layout) del siguiente contenido sin cambiar ni una sola palabra del texto original.
 
         REGLAS CRÍTICAS:
-        1. Devuelve ÚNICAMENTE el código HTML de una lista <ul> con sus <li>.
-        2. NO incluyas <h2>, <h3> ni párrafos <p> de introducción o conclusión.
-        3. NO uses emojis ni emoticonos.
-        4. Cada punto de la lista debe ser breve y directo (máximo 15 palabras por punto).
-        5. Mantén la información original, solo mejora la redacción para que sea profesional.
-        6. No incluyas bloques de código markdown (\`\`\`html), solo el texto HTML final.
+        1. Mantén el 100% de las palabras originales del texto. NO resumas, NO edites las frases, NO elimines nada. Fidelidad absoluta al texto original.
+        2. Tu único trabajo es añadir etiquetas HTML semánticas para mejorar la legibilidad y el impacto visual:
+           - Usa <h3> para subtítulos o inicios de secciones.
+           - Usa <strong> para resaltar términos o conceptos clave.
+           - Usa <p> para separar párrafos y asegurar un buen espaciado.
+           - Usa <ul> y <li> si el texto original contiene enumeraciones o listas.
+        3. El resultado debe verse profesional, limpio y fácil de leer.
+        4. Devuelve ÚNICAMENTE el código HTML resultante. 
+        5. NO incluyas bloques de código markdown (\`\`\`html), solo el texto HTML final.
         
         TEXTO A PROCESAR:
         ${text}
         
-        CONTENIDO FORMATEADO (SOLO <ul>):
+        CONTENIDO MAQUETADO (HTML):
         `;
 
         try {
