@@ -367,58 +367,62 @@ const Home: React.FC = () => {
                 to="/blog"
                 className="animate-on-scroll text-primary font-black text-xs uppercase tracking-[0.2em] flex items-center gap-2 group hover:text-secondary transition-all"
               >
-                {t('nav.blog', 'Ver todas las noticias')}
+                {t('nav.blog', 'Explorar todo')}
                 <span className="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform">arrow_forward</span>
               </Link>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-8 md:gap-12">
-              {latestPosts.map((post, i) => {
-                const imageUrl = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=800';
-                const category = post._embedded?.['wp:term']?.[0]?.[0]?.name || t('blog.category.default', 'Noticias');
-                const stripHtml = (html: string) => {
-                  const tmp = document.createElement("DIV");
-                  tmp.innerHTML = html;
-                  return tmp.textContent || tmp.innerText || "";
-                };
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              {/* Featured Post (Large) */}
+              <div className="lg:col-span-7 animate-on-scroll">
+                {latestPosts[0] && (
+                  <Link to={`/blog/${latestPosts[0].slug}`} className="group block relative h-[500px] rounded-[3rem] overflow-hidden shadow-2xl">
+                    <img
+                      src={latestPosts[0]._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=1200'}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                      alt=""
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-primary via-primary/20 to-transparent"></div>
+                    <div className="absolute bottom-0 left-0 p-10 w-full">
+                      <span className="bg-secondary text-primary px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest mb-4 inline-block shadow-lg">
+                        {latestPosts[0]._embedded?.['wp:term']?.[0]?.[0]?.name || 'Noticia'}
+                      </span>
+                      <h3 className="text-3xl font-black text-white leading-tight mb-4 group-hover:text-secondary transition-colors" dangerouslySetInnerHTML={{ __html: latestPosts[0].title.rendered }} />
+                      <p className="text-slate-300 text-sm font-light line-clamp-2 max-w-lg mb-0 opacity-80 group-hover:opacity-100 transition-opacity">
+                        {latestPosts[0].excerpt.rendered.replace(/<[^>]*>?/gm, '').slice(0, 120)}...
+                      </p>
+                    </div>
+                  </Link>
+                )}
+              </div>
 
-                return (
+              {/* Secondary Posts (Small stack) */}
+              <div className="lg:col-span-5 flex flex-col gap-6">
+                {latestPosts.slice(1, 3).map((post, i) => (
                   <Link
                     key={post.id}
                     to={`/blog/${post.slug}`}
-                    className={`group animate-on-scroll stagger-${i + 1}`}
+                    className={`flex gap-6 p-4 rounded-[2rem] hover:bg-slate-50 transition-all border border-transparent hover:border-slate-100 group animate-on-scroll stagger-${i + 1}`}
                   >
-                    <article>
-                      <div className="aspect-[16/10] bg-slate-100 rounded-[2.5rem] overflow-hidden mb-8 shadow-sm group-hover:shadow-2xl group-hover:-translate-y-2 transition-all duration-500">
-                        <img
-                          src={imageUrl}
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                          alt={post.title.rendered}
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-primary/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                      <div className="flex items-center gap-3 mb-4">
-                        <span className="text-[10px] font-black uppercase text-secondary tracking-widest">{category}</span>
-                        <div className="h-1 w-1 rounded-full bg-slate-300" />
-                        <span className="text-[10px] font-bold text-slate-400">
-                          {new Date(post.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
-                        </span>
-                      </div>
-                      <h3
-                        className="text-xl font-bold text-primary group-hover:text-secondary transition-colors leading-tight mb-4"
-                        dangerouslySetInnerHTML={{ __html: post.title.rendered }}
+                    <div className="w-32 h-32 rounded-2xl overflow-hidden flex-shrink-0 shadow-sm group-hover:shadow-md transition-all">
+                      <img
+                        src={post._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=400'}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        alt=""
                       />
-                      <p className="text-slate-500 text-sm line-clamp-2 leading-relaxed font-light mb-6">
-                        {stripHtml(post.excerpt.rendered)}
+                    </div>
+                    <div className="flex flex-col justify-center py-2">
+                      <span className="text-[10px] font-black text-secondary tracking-widest uppercase mb-2">
+                        {post._embedded?.['wp:term']?.[0]?.[0]?.name || 'Noticia'}
+                      </span>
+                      <h4 className="text-lg font-bold text-primary leading-tight group-hover:text-secondary transition-colors mb-2 line-clamp-2" dangerouslySetInnerHTML={{ __html: post.title.rendered }} />
+                      <p className="text-xs text-slate-400 font-light line-clamp-2">
+                        {post.excerpt.rendered.replace(/<[^>]*>?/gm, '').slice(0, 80)}...
                       </p>
-                      <div className="flex items-center gap-2 text-primary font-black text-[10px] uppercase tracking-widest group-hover:gap-3 transition-all">
-                        {t('common.readmore')}
-                        <span className="material-symbols-outlined text-sm">chevron_right</span>
-                      </div>
-                    </article>
+                    </div>
                   </Link>
-                );
-              })}
+                ))}
+              </div>
             </div>
           </div>
         </section>
