@@ -10,6 +10,7 @@ interface Post {
     content: { rendered: string };
     date: string;
     categories: number[];
+    featured_media_url?: string;
     _embedded?: {
         'wp:featuredmedia'?: Array<{ source_url: string }>;
         'wp:term'?: Array<Array<{ name: string; id: number }>>;
@@ -61,7 +62,7 @@ const PostDetalle: React.FC = () => {
         );
     }
 
-    const imageUrl = post._embedded?.['wp:featuredmedia']?.[0]?.source_url;
+    const imageUrl = post.featured_media_url || post._embedded?.['wp:featuredmedia']?.[0]?.source_url;
     const category = post._embedded?.['wp:term']?.[0]?.[0]?.name || 'Noticias';
 
     return (
@@ -154,7 +155,7 @@ const PostDetalle: React.FC = () => {
                             <div className="space-y-8">
                                 {relatedPosts.length > 0 ? (
                                     relatedPosts.map((rPost) => {
-                                        const rImg = rPost._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=400';
+                                        const rImg = rPost.featured_media_url || rPost._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=400';
                                         return (
                                             <Link key={rPost.id} to={`/blog/${rPost.slug}`} className="group flex gap-4 items-start">
                                                 <div className="w-16 h-16 rounded-2xl overflow-hidden shrink-0 shadow-sm group-hover:shadow-md transition-shadow">

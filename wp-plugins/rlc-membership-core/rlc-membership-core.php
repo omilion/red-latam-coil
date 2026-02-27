@@ -643,6 +643,9 @@ class RLC_Membership_Core
 
     public function register_product_meta_fields()
     {
+        register_post_meta('post', 'featured_media_url', ['type' => 'string', 'single' => true, 'show_in_rest' => true]);
+        register_post_meta('product', 'featured_media_url', ['type' => 'string', 'single' => true, 'show_in_rest' => true]);
+
         $meta = ['rlc_event_date', 'rlc_event_date_end', 'rlc_event_time', 'rlc_event_location', 'rlc_event_is_featured', 'rlc_event_pretitle', 'rlc_event_subtitle', 'rlc_event_program', 'rlc_event_objectives', 'rlc_event_program_desc', 'rlc_membership_duration'];
         foreach ($meta as $f)
             register_meta('post', $f, ['object_subtype' => 'product', 'type' => 'string', 'single' => true, 'show_in_rest' => true]);

@@ -378,7 +378,7 @@ const Home: React.FC = () => {
                 {latestPosts[0] && (
                   <Link to={`/blog/${latestPosts[0].slug}`} className="group block relative h-[500px] rounded-[3rem] overflow-hidden shadow-2xl">
                     <img
-                      src={latestPosts[0]._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=1200'}
+                      src={latestPosts[0].featured_media_url || latestPosts[0]._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=1200'}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                       alt=""
                     />
@@ -406,7 +406,7 @@ const Home: React.FC = () => {
                   >
                     <div className="w-32 h-32 rounded-2xl overflow-hidden flex-shrink-0 shadow-sm group-hover:shadow-md transition-all">
                       <img
-                        src={post._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=400'}
+                        src={post.featured_media_url || post._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=400'}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                         alt=""
                       />

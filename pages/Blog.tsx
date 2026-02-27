@@ -63,7 +63,7 @@ const Blog: React.FC = () => {
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
             {posts.length > 0 ? (
               posts.map((post) => {
-                const imageUrl = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=800';
+                const imageUrl = post.featured_media_url || post._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=800';
                 const category = post._embedded?.['wp:term']?.[0]?.[0]?.name || t('blog.category.default');
 
                 return (
