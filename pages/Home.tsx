@@ -12,6 +12,7 @@ const Home: React.FC = () => {
   const { t } = useTranslation();
   const [featuredEvent, setFeaturedEvent] = useState<any>(null);
   const [webSettings, setWebSettings] = useState<any>(null);
+  const [latestPosts, setLatestPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -36,9 +37,10 @@ const Home: React.FC = () => {
   useEffect(() => {
     const loadAllData = async () => {
       try {
-        const [productsData, settingsData] = await Promise.all([
+        const [productsData, settingsData, postsData] = await Promise.all([
           wpService.getProducts(),
-          wpService.getWebSettings()
+          wpService.getWebSettings(),
+          wpService.getPosts()
         ]);
 
         // Buscamos el primero que sea destacado, o el último evento creado
@@ -49,6 +51,7 @@ const Home: React.FC = () => {
         const featured = events.find((e: any) => e.rlc_event_is_featured) || events[0];
         setFeaturedEvent(featured);
         setWebSettings(settingsData);
+        setLatestPosts(Array.isArray(postsData) ? postsData.slice(0, 3) : []);
       } catch (error) {
         console.error('Error loading data:', error);
       } finally {
@@ -346,6 +349,80 @@ const Home: React.FC = () => {
           </div>
         </div>
       </section>
+
+      {/* Latest News Section */}
+      {latestPosts.length > 0 && (
+        <section className="bg-white py-24 mb-12">
+          <div className="max-w-7xl mx-auto px-6">
+            <div className="flex flex-col md:flex-row justify-between items-end gap-8 mb-16">
+              <div className="max-w-xl animate-on-scroll">
+                <span className="inline-block bg-accent/10 text-accent px-4 py-1 rounded-full text-[10px] font-black tracking-widest uppercase mb-4 border border-accent/20">
+                  {t('blog.category.default', 'Noticias')}
+                </span>
+                <h2 className="font-display text-3xl lg:text-5xl font-extrabold text-primary leading-tight">
+                  {t('blog.title', 'Últimas Noticias')}
+                </h2>
+              </div>
+              <Link
+                to="/blog"
+                className="animate-on-scroll text-primary font-black text-xs uppercase tracking-[0.2em] flex items-center gap-2 group hover:text-secondary transition-all"
+              >
+                {t('nav.blog', 'Ver todas las noticias')}
+                <span className="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform">arrow_forward</span>
+              </Link>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-8 md:gap-12">
+              {latestPosts.map((post, i) => {
+                const imageUrl = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=800';
+                const category = post._embedded?.['wp:term']?.[0]?.[0]?.name || t('blog.category.default', 'Noticias');
+                const stripHtml = (html: string) => {
+                  const tmp = document.createElement("DIV");
+                  tmp.innerHTML = html;
+                  return tmp.textContent || tmp.innerText || "";
+                };
+
+                return (
+                  <Link
+                    key={post.id}
+                    to={`/blog/${post.slug}`}
+                    className={`group animate-on-scroll stagger-${i + 1}`}
+                  >
+                    <article>
+                      <div className="aspect-[16/10] bg-slate-100 rounded-[2.5rem] overflow-hidden mb-8 shadow-sm group-hover:shadow-2xl group-hover:-translate-y-2 transition-all duration-500">
+                        <img
+                          src={imageUrl}
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                          alt={post.title.rendered}
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-primary/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                      <div className="flex items-center gap-3 mb-4">
+                        <span className="text-[10px] font-black uppercase text-secondary tracking-widest">{category}</span>
+                        <div className="h-1 w-1 rounded-full bg-slate-300" />
+                        <span className="text-[10px] font-bold text-slate-400">
+                          {new Date(post.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
+                        </span>
+                      </div>
+                      <h3
+                        className="text-xl font-bold text-primary group-hover:text-secondary transition-colors leading-tight mb-4"
+                        dangerouslySetInnerHTML={{ __html: post.title.rendered }}
+                      />
+                      <p className="text-slate-500 text-sm line-clamp-2 leading-relaxed font-light mb-6">
+                        {stripHtml(post.excerpt.rendered)}
+                      </p>
+                      <div className="flex items-center gap-2 text-primary font-black text-[10px] uppercase tracking-widest group-hover:gap-3 transition-all">
+                        {t('common.readmore')}
+                        <span className="material-symbols-outlined text-sm">chevron_right</span>
+                      </div>
+                    </article>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Final Banner */}
       <section className="px-6 py-24 mb-24">
