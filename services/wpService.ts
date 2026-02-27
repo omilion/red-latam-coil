@@ -706,5 +706,47 @@ export const wpService = {
       console.error('WP Service Error (getUserActivity):', error);
       return { events: [], orders: [] };
     }
+  },
+
+  /**
+   * FORMULARIO DE CONTACTO: Envía los datos al endpoint personalizado.
+   */
+  async submitContactForm(data: { name: string, email: string, subject: string, message: string }) {
+    try {
+      const response = await fetch(`${WP_URL}/wp-json/rlc/v1/contact`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || 'Error al enviar el mensaje');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('WP Service Error (submitContactForm):', error);
+      throw error;
+    }
+  },
+
+  /**
+   * NEWSLETTER: Obtiene la lista de leads (solo admin).
+   */
+  async getNewsletterLeads() {
+    try {
+      const token = localStorage.getItem('rlc_token');
+      const response = await fetch(`${WP_URL}/wp-json/rlc/v1/admin/newsletter/leads`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
+      return await response.json();
+    } catch (error) {
+      console.error('WP Service Error (getNewsletterLeads):', error);
+      return [];
+    }
   }
 };

@@ -24,6 +24,7 @@ const AdminPortal: React.FC = () => {
     const [resources, setResources] = useState<any[]>([]);
     const [resourceCategories, setResourceCategories] = useState<any[]>([]);
     const [webSettings, setWebSettings] = useState<any>(null);
+    const [newsletterLeads, setNewsletterLeads] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('membresias');
     const [editingItem, setEditingItem] = useState<any>(null);
@@ -104,6 +105,10 @@ const AdminPortal: React.FC = () => {
                 stats: [{ label: 'UNIVERSIDADES', value: '+150' }, { label: 'ESTUDIANTES', value: '+5,000' }, { label: 'PAÍSES', value: '+12' }, { label: 'PROYECTOS COIL', value: '+300' }],
                 team: []
             });
+
+            // Cargar leads de newsletter de forma independiente
+            const leads = await wpService.getNewsletterLeads();
+            setNewsletterLeads(leads);
         } catch (error) {
             console.error('Error cargando datos de admin:', error);
         }
@@ -523,7 +528,7 @@ const AdminPortal: React.FC = () => {
                         { id: 'recursos', name: t('admin.sidebar.resources'), icon: 'folder_shared' },
                         { id: 'eventos', name: t('admin.sidebar.events'), icon: 'calendar_today' },
                         { id: 'web', name: t('admin.sidebar.web'), icon: 'language' },
-                        { id: 'config', name: t('admin.sidebar.config'), icon: 'settings' },
+                        { id: 'newsletter', name: 'Newsletter', icon: 'mail' },
                     ].map((item) => (
                         <button
                             key={item.id}
@@ -562,7 +567,7 @@ const AdminPortal: React.FC = () => {
                             <div className="h-2 w-2 bg-secondary rounded-full"></div>
                         </h2>
                         <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">
-                            {activeTab === 'config' ? 'Ajustes del sistema y plataforma' : `Gestión integral de ${activeTab}`}
+                            {activeTab === 'newsletter' ? 'Gestión de suscriptores y leads' : `Gestión integral de ${activeTab}`}
                         </p>
                     </div>
                     <div className="flex items-center gap-4">
@@ -1303,11 +1308,65 @@ const AdminPortal: React.FC = () => {
                 }
 
                 {
-                    activeTab === 'config' && (
-                        <div className="p-10 text-center bg-slate-800/30 border border-slate-700/50 rounded-[2.5rem]">
-                            <span className="material-symbols-outlined text-5xl text-slate-700 mb-4">settings</span>
-                            <h3 className="text-xl font-bold text-white">Configuración del Sistema</h3>
-                            <p className="text-slate-500 max-w-md mx-auto mt-2">Ajustes globales de la Red LatAm COIL, claves de API y parámetros de membresía.</p>
+                    activeTab === 'newsletter' && (
+                        <div className="space-y-8 animate-in fade-in duration-500">
+                            <div className="flex justify-between items-end mb-4">
+                                <div>
+                                    <h3 className="text-2xl font-black text-primary tracking-tight">Suscriptores al Newsletter</h3>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Lista de correos capturados desde el footer y widgets</p>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        const csvContent = "data:text/csv;charset=utf-8,Email\n" + newsletterLeads.join("\n");
+                                        const encodedUri = encodeURI(csvContent);
+                                        const link = document.createElement("a");
+                                        link.setAttribute("href", encodedUri);
+                                        link.setAttribute("download", "newsletter_leads_rlc.csv");
+                                        document.body.appendChild(link);
+                                        link.click();
+                                        document.body.removeChild(link);
+                                    }}
+                                    className="bg-primary text-secondary px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-secondary hover:text-primary transition-all shadow-xl shadow-primary/10"
+                                >
+                                    <span className="material-symbols-outlined text-lg">download</span>
+                                    Descargar CSV (Excel)
+                                </button>
+                            </div>
+
+                            <div className="bg-white border border-slate-200 rounded-[2.5rem] overflow-hidden shadow-sm">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left">
+                                        <thead className="bg-slate-50 border-b border-slate-100">
+                                            <tr>
+                                                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Correo Electrónico</th>
+                                                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Origen</th>
+                                                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Acción</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {newsletterLeads.length > 0 ? (
+                                                newsletterLeads.map((email, idx) => (
+                                                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                                                        <td className="px-8 py-6 font-bold text-primary">{email}</td>
+                                                        <td className="px-8 py-6">
+                                                            <span className="text-[9px] font-black uppercase bg-slate-100 text-slate-500 px-3 py-1 rounded-full border border-slate-200">Footer Widget</span>
+                                                        </td>
+                                                        <td className="px-8 py-6 text-right">
+                                                            <button className="text-slate-300 hover:text-secondary transition-colors">
+                                                                <span className="material-symbols-outlined">mail</span>
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            ) : (
+                                                <tr>
+                                                    <td colSpan={3} className="px-8 py-20 text-center text-slate-400 italic">No hay suscriptores registrados aún.</td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     )
                 }

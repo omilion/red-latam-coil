@@ -45,7 +45,7 @@ class RLC_Membership_Core
 
         // 7. Configuración de Correo Saliente y Newsletter
         add_filter('wp_mail_from', function () {
-            return 'admin@redlatamcoil.com';
+            return 'info@redlatamcoil.com';
         });
         add_filter('wp_mail_from_name', function () {
             return 'Red LATAM COIL';
@@ -143,6 +143,12 @@ class RLC_Membership_Core
             'permission_callback' => '__return_true'
         ]);
 
+        register_rest_route('rlc/v1', '/contact', [
+            'methods' => 'POST',
+            'callback' => [$this, 'handle_contact_form'],
+            'permission_callback' => '__return_true'
+        ]);
+
         register_rest_route('rlc/v1', '/categories', [
             'methods' => 'GET',
             'callback' => [$this, 'get_resource_categories'],
@@ -152,6 +158,12 @@ class RLC_Membership_Core
         register_rest_route('rlc/v1', '/admin/categories', [
             'methods' => 'POST',
             'callback' => [$this, 'create_resource_category'],
+            'permission_callback' => [$this, 'is_admin']
+        ]);
+
+        register_rest_route('rlc/v1', '/admin/newsletter/leads', [
+            'methods' => 'GET',
+            'callback' => [$this, 'get_newsletter_leads'],
             'permission_callback' => [$this, 'is_admin']
         ]);
 
@@ -390,13 +402,55 @@ class RLC_Membership_Core
         }
 
         // Enviar notificación al admin
-        $to = 'admin@redlatamcoil.com';
+        $to = 'info@redlatamcoil.com';
         $subject = 'Nueva suscripción al Newsletter - Red LATAM COIL';
         $message = "Se ha recibido una nueva suscripción al newsletter:\n\nEmail: $email\nFecha: " . date('Y-m-d H:i:s');
 
         wp_mail($to, $subject, $message);
 
         return new WP_REST_Response(['success' => true, 'message' => 'Suscripción exitosa'], 200);
+    }
+
+    public function handle_contact_form($request)
+    {
+        $name = sanitize_text_field($request['name']);
+        $email = sanitize_email($request['email']);
+        $subject_type = sanitize_text_field($request['subject']);
+        $message_text = sanitize_textarea_field($request['message']);
+
+        if (empty($name) || empty($email) || empty($message_text)) {
+            return new WP_Error('missing_fields', 'Todos los campos son obligatorios', ['status' => 400]);
+        }
+
+        if (!is_email($email)) {
+            return new WP_Error('invalid_email', 'Email inválido', ['status' => 400]);
+        }
+
+        // Notificación al Admin
+        $to = 'info@redlatamcoil.com';
+        $email_subject = "Nuevo mensaje de contacto: $subject_type - $name";
+        $email_body = "Has recibido un nuevo mensaje desde el sitio web de Red LATAM COIL.\n\n";
+        $email_body .= "Nombre: $name\n";
+        $email_body .= "Email: $email\n";
+        $email_body .= "Asunto: $subject_type\n\n";
+        $email_body .= "Mensaje:\n$message_text\n\n";
+        $email_body .= "Fecha: " . date('Y-m-d H:i:s');
+
+        $headers = array('Content-Type: text/plain; charset=UTF-8', "Reply-To: $name <$email>");
+
+        $sent = wp_mail($to, $email_subject, $email_body, $headers);
+
+        if (!$sent) {
+            return new WP_Error('email_failed', 'No se pudo enviar el correo', ['status' => 500]);
+        }
+
+        return new WP_REST_Response(['success' => true, 'message' => 'Mensaje enviado correctamente'], 200);
+    }
+
+    public function get_newsletter_leads()
+    {
+        $leads = get_option('rlc_newsletter_leads', []);
+        return new WP_REST_Response($leads, 200);
     }
 
     public function get_user_profile()

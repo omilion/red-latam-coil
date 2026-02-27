@@ -1,9 +1,25 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from '../context/useTranslation';
+import { wpService } from '../services/wpService';
 
 const Contacto: React.FC = () => {
   const { t } = useTranslation();
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    subject: '',
+    message: ''
+  });
+
+  // Inicializar el asunto cuando cambie la traducción
+  useEffect(() => {
+    if (!formData.subject) {
+      setFormData(prev => ({ ...prev, subject: t('contact.form.subject.mem') }));
+    }
+  }, [t, formData.subject]);
 
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
@@ -20,6 +36,33 @@ const Contacto: React.FC = () => {
 
     return () => observer.disconnect();
   }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setStatus(null);
+
+    try {
+      await wpService.submitContactForm(formData);
+      setStatus({
+        type: 'success',
+        message: '¡Mensaje enviado con éxito! Nos pondremos en contacto con usted pronto.'
+      });
+      setFormData({
+        name: '',
+        email: '',
+        subject: t('contact.form.subject.mem'),
+        message: ''
+      });
+    } catch (error: any) {
+      setStatus({
+        type: 'error',
+        message: error.message || 'Hubo un error al enviar el mensaje. Por favor, inténtelo de nuevo.'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="bg-slate-50 min-h-screen py-24 px-6 relative overflow-hidden">
@@ -79,20 +122,43 @@ const Contacto: React.FC = () => {
 
           <div className="bg-white p-10 lg:p-14 rounded-[3rem] shadow-2xl border border-slate-100/50 order-1 lg:order-2 w-full animate-on-scroll stagger-3 relative">
             <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/5 rounded-bl-full pointer-events-none"></div>
-            <form className="space-y-6 relative z-10">
+            <form onSubmit={handleSubmit} className="space-y-6 relative z-10">
+              {status && (
+                <div className={`p-4 rounded-2xl text-sm font-bold ${status.type === 'success' ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
+                  {status.message}
+                </div>
+              )}
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="text-xs font-black uppercase text-slate-400 tracking-widest">{t('contact.form.name')}</label>
-                  <input type="text" className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-secondary/20 outline-none" placeholder="Ej. Ana García" />
+                  <input
+                    type="text"
+                    required
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-secondary/20 outline-none"
+                    placeholder="Ej. Ana García"
+                  />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-black uppercase text-slate-400 tracking-widest">{t('contact.form.email')}</label>
-                  <input type="email" className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-secondary/20 outline-none" placeholder="ana@ejemplo.com" />
+                  <input
+                    type="email"
+                    required
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-secondary/20 outline-none"
+                    placeholder="ana@ejemplo.com"
+                  />
                 </div>
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-black uppercase text-slate-400 tracking-widest">{t('contact.form.subject')}</label>
-                <select className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-secondary/20 outline-none">
+                <select
+                  value={formData.subject}
+                  onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                  className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-secondary/20 outline-none"
+                >
                   <option>{t('contact.form.subject.mem')}</option>
                   <option>{t('contact.form.subject.reg')}</option>
                   <option>{t('contact.form.subject.alli')}</option>
@@ -101,10 +167,28 @@ const Contacto: React.FC = () => {
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-black uppercase text-slate-400 tracking-widest">{t('contact.form.msg')}</label>
-                <textarea rows={5} className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-secondary/20 outline-none resize-none" placeholder={t('contact.form.msg.placeholder')}></textarea>
+                <textarea
+                  required
+                  rows={5}
+                  value={formData.message}
+                  onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                  className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-secondary/20 outline-none resize-none"
+                  placeholder={t('contact.form.msg.placeholder')}
+                ></textarea>
               </div>
-              <button type="submit" className="pulse-glow-btn w-full bg-accent text-primary font-black py-5 rounded-2xl shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all text-lg tracking-widest uppercase">
-                {t('contact.form.cta')}
+              <button
+                type="submit"
+                disabled={loading}
+                className={`pulse-glow-btn w-full bg-accent text-primary font-black py-5 rounded-2xl shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all text-lg tracking-widest uppercase flex items-center justify-center gap-3 ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
+              >
+                {loading ? (
+                  <>
+                    <span className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></span>
+                    {t('contact.form.cta')}...
+                  </>
+                ) : (
+                  t('contact.form.cta')
+                )}
               </button>
             </form>
           </div>
